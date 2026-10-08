@@ -1,0 +1,14 @@
+libraries: https://github.com/rgb-protocol
+tools: https://github.com/RGB-Tools
+	- rgb lib --> already made wallet with rgb --> only call to the helper functions
+		| Language | Tool | Platform | Repository |
+		| --- | --- | --- | --- |
+		| C | c-ffi | Linux, macOS, Windows | c-ffi |
+		| C++ | c-ffi | Linux, macOS, Windows | c-ffi |
+		| Kotlin | uniffi | Android | rgb-lib-kotlin |
+		| Node.js | c-ffi | Linux, macOS, Windows | rgb-lib-nodejs |
+		| Python | uniffi | Linux, macOS, Windows | rgb-lib-python |
+		| Swift | uniffi | iOS, macOS | rgb-lib-swift |
+	- demo rgb functions (Wallet, keys, invoices, schemas): https://github.com/RGB-Tools/rgb-lib-python/tree/master/demo
+	- qvac: https://docs.qvac.tether.io/sdk/
+
