@@ -1,14 +1,14 @@
-## hackathon-agentic-dollars
+# hackathon-agentic-dollars
 
-# Team name
+## Team and project name
 
-# Members
+## Members
 * Yann: malgamoe
 * Aurelio: aurelio9851
 * Valentino: vcastald
 
-# Project idea
+## Project idea
 
-# Stack
+## Stack
 
 *Work done before the start of the hackathon is in the lib folder*
