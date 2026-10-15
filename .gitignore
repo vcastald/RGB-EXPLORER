@@ -1,0 +1,122 @@
+# ==========================================
+# 1. Dipendenze & Package Managers
+# ==========================================
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+.pnpm-debug.log*
+
+# ==========================================
+# 2. Build & Vite
+# ==========================================
+dist/
+dist-ssr/
+build/
+*.local
+.vite/
+.turbo/
+
+# ==========================================
+# 3. Variabili d'Ambiente & Segreti (CRITICO)
+# ==========================================
+# Evita il leak di API keys per LLM, RPC URLs e chiavi private
+.env
+.env.*
+!.env.example
+!.env.template
+
+# ==========================================
+# 4. KaleidoSwap (Web3, Lightning, RGB & Nodi)
+# ==========================================
+# Wallet, Seed, Mnemonics e Chiavi Crittografiche
+*.seed
+*.mnemonic
+*.key
+*.pem
+*.cert
+*.macaroon
+wallet.json
+wallets/
+keystore/
+keys/
+
+# Dati di stato locali (RGB, LND, LDK, BDK, Regtest)
+.kaleidoswap/
+kaleidoswap-data/
+.rgb/
+rgb_data/
+.ldk/
+.lnd/
+lightning-data/
+channel-backups/
+*.channel
+
+# Build WebAssembly 
+*.wasm.map
+
+# ==========================================
+# 5. KaleidoMind & Agenti QVAC (AI, Stato & DB)
+# ==========================================
+# Directory di runtime, memoria e workspace degli agenti
+.kaleidomind/
+.qvac/
+qvac-agents/
+agent-memory/
+agent-state/
+agent_workspace/
+checkpoints/
+sessions/
+traces/
+
+# Database vettoriali e storage locale degli agenti
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+chroma_db/
+lancedb/
+milvus/
+qdrant_storage/
+faiss_index/
+vector_store/
+
+# Modelli locali e pesi (se gli agenti QVAC girano in locale/WASM)
+models/
+weights/
+*.onnx
+*.gguf
+*.bin
+*.safetensors
+
+# ==========================================
+# 6. Log, Test & Debug
+# ==========================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# ==========================================
+# 7. IDE, Editor & OS
+# ==========================================
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+.DS_Store
+Thumbs.db
+Desktop.ini
