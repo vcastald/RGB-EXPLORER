@@ -13,6 +13,7 @@ export function formatAmount(amount: number, asset: AssetType): string {
         maximumFractionDigits: 4,
       }).format(amount) + ' XAUT'
     case 'BTC':
+    case 'BTC_LN':
       return new Intl.NumberFormat('it-IT', {
         minimumFractionDigits: 8,
         maximumFractionDigits: 8,

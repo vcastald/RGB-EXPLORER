@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Transaction, AssetType, Denomination } from '../types/transaction'
+import { Transaction, AssetType, Denomination, ChannelLiquidity } from '../types/transaction'
 import { formatAmount } from '../utils/formatters'
 import type { MarketQuote } from '../hooks/useFrame'
 
@@ -10,6 +10,7 @@ interface AssetPieChartProps {
   denomination: Denomination
   loading?: boolean
   quotes?: MarketQuote[]
+  channelLiquidity?: ChannelLiquidity | null
 }
 
 // Fallback rates in USD if quotes are not yet loaded
@@ -17,6 +18,7 @@ const DEFAULT_RATES_IN_USD: Record<AssetType, number> = {
   USDT: 1.0,
   XAUT: 2680.0,
   BTC: 80000.0,
+  BTC_LN: 80000.0,
 }
 
 function formatConverted(val: number, denomination: Denomination): string {
@@ -50,6 +52,7 @@ export function AssetPieChart({
   denomination,
   loading = false,
   quotes,
+  channelLiquidity,
 }: AssetPieChartProps) {
   const [hoveredAsset, setHoveredAsset] = useState<AssetType | null>(null)
 
@@ -68,6 +71,7 @@ export function AssetPieChart({
       USDT: 1.0,
       XAUT: xautPrice,
       BTC: btcPrice,
+      BTC_LN: btcPrice,
     }
 
     const settled = transactions.filter((t) => t.status === 'settled' || !t.status)
@@ -79,17 +83,47 @@ export function AssetPieChart({
       .filter((t) => t.asset === 'XAUT')
       .reduce((sum, t) => sum + t.amount, 0)
 
-    // Calculate BTC from backend transactions: incoming positive, outgoing negative
-    const btcTxs = transactions.filter((t) => t.asset === 'BTC' && (t.status === 'settled' || !t.status))
-    const btcAmount = Math.max(
-      0,
-      btcTxs.reduce((sum, t) => sum + (t.direction === 'outgoing' ? -t.amount : t.amount), 0)
+    // Calculate on-chain BTC (excluding lightning payments)
+    const onchainBtcTxs = transactions.filter(
+      (t) =>
+        (t.asset === 'BTC' || t.asset === 'BTC_LN') &&
+        t.paymentType !== 'lightning' &&
+        !t.paymentHash &&
+        (t.status === 'settled' || !t.status)
     )
+    const btcOnChainAmount = Math.max(
+      0,
+      onchainBtcTxs.reduce((sum, t) => sum + (t.direction === 'outgoing' ? -t.amount : t.amount), 0)
+    )
+
+    // Calculate settled Bitcoin funds on Lightning channels (strictly BTC, excluding RGB tokens)
+    const btcLightningTxs = transactions.filter(
+      (t) =>
+        (t.asset === 'BTC' || t.asset === 'BTC_LN') &&
+        (t.paymentType === 'lightning' || Boolean(t.paymentHash)) &&
+        (t.status === 'settled' || !t.status)
+    )
+    const btcLightningAmount = Math.max(
+      0,
+      btcLightningTxs.reduce((sum, t) => sum + (t.direction === 'outgoing' ? -t.amount : t.amount), 0)
+    )
+
+    // Strictly count Bitcoin liquidity on Lightning:
+    // Prioritizes settled Lightning payments (e.g. 0.00001 BTC = 1,000 sats).
+    // If no payments exist yet, falls back to the local channel balance (or 0).
+    const lightningLiquidityBtc =
+      btcLightningAmount > 0
+        ? btcLightningAmount
+        : channelLiquidity?.localBalanceBtc != null && channelLiquidity.localBalanceBtc > 0
+        ? channelLiquidity.localBalanceBtc
+        : 0
 
     const usdtUsd = usdtAmount * rates.USDT
     const xautUsd = xautAmount * rates.XAUT
-    const btcUsd = btcAmount * rates.BTC
-    const totalUsd = usdtUsd + xautUsd + btcUsd || 1
+    const btcOnChainUsd = btcOnChainAmount * rates.BTC
+    const lnUsd = lightningLiquidityBtc * rates.BTC_LN
+
+    const totalUsd = usdtUsd + xautUsd + btcOnChainUsd + lnUsd || 1
     const totalConverted = denomination === 'USD' ? totalUsd : totalUsd / rates.BTC
 
     const rawAssets = [
@@ -115,17 +149,27 @@ export function AssetPieChart({
       },
       {
         asset: 'BTC' as AssetType,
-        name: 'Bitcoin Native',
+        name: 'Bitcoin On-Chain',
         protocol: 'On-Chain (Node)',
-        amount: btcAmount,
-        convertedValue: denomination === 'USD' ? btcUsd : btcAmount,
-        percent: (btcUsd / totalUsd) * 100,
+        amount: btcOnChainAmount,
+        convertedValue: denomination === 'USD' ? btcOnChainUsd : btcOnChainAmount,
+        percent: (btcOnChainUsd / totalUsd) * 100,
         color: '#f97316', // orange-500
         hoverColor: '#fb923c',
       },
+      {
+        asset: 'BTC_LN' as AssetType,
+        name: 'BTC on Lightning',
+        protocol: 'Lightning Network',
+        amount: lightningLiquidityBtc,
+        convertedValue: denomination === 'USD' ? lnUsd : lightningLiquidityBtc,
+        percent: (lnUsd / totalUsd) * 100,
+        color: '#6366f1', // indigo-500
+        hoverColor: '#818cf8',
+      },
     ]
 
-    // Visual min-slice percentage so tiny BTC amounts (e.g. 0.0001 BTC) remain visible and clickable on SVG donut
+    // Visual min-slice percentage so tiny amounts remain visible and clickable on SVG donut
     const rawSumWithMin = rawAssets.reduce(
       (sum, a) => sum + (a.percent > 0 ? Math.max(a.percent, 3.5) : 0),
       0
@@ -142,7 +186,7 @@ export function AssetPieChart({
       totalConverted,
       assets,
     }
-  }, [transactions, denomination, quotes])
+  }, [transactions, denomination, quotes, channelLiquidity])
 
   // Donut SVG parameters
   const radius = 64
@@ -181,11 +225,11 @@ export function AssetPieChart({
             </div>
           </div>
 
-          <div className="w-full space-y-2 mt-4">
-            {[1, 2, 3].map((i) => (
+          <div className="w-full space-y-1.5 mt-2">
+            {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="flex items-center justify-between rounded-xl border border-slate-800/80 bg-slate-950/40 p-2.5"
+                className="flex items-center justify-between rounded-xl border border-slate-800/80 bg-slate-950/40 p-2"
               >
                 <div className="flex items-center gap-2.5">
                   <div className="h-3 w-3 rounded-full bg-slate-800" />
@@ -205,8 +249,8 @@ export function AssetPieChart({
       ) : (
         <>
           {/* Donut Chart Center Graphic */}
-          <div className="relative my-2 flex items-center justify-center">
-            <svg width="155" height="155" viewBox="0 0 200 200" className="transform -rotate-90">
+          <div className="relative my-1.5 flex items-center justify-center flex-shrink-0">
+            <svg width="140" height="140" viewBox="0 0 200 200" className="transform -rotate-90">
               {/* Background circle track */}
               <circle
                 cx="100"
@@ -278,8 +322,8 @@ export function AssetPieChart({
             </div>
           </div>
 
-          {/* Legend & Breakdown per Asset */}
-          <div className="space-y-1.5">
+          {/* Legend & Breakdown per Asset with Scrollbar */}
+          <div className="flex-1 min-h-0 space-y-1.5 overflow-y-auto pr-1 custom-scrollbar">
             {stats.assets.map((item) => {
               const isSelected = selectedAsset === item.asset
               return (
@@ -330,7 +374,7 @@ export function AssetPieChart({
 
           {/* Reset selection button if filtered */}
           {selectedAsset !== 'ALL' && (
-            <div className="mt-1.5 text-center">
+            <div className="mt-1.5 text-center flex-shrink-0">
               <button
                 onClick={() => onSelectAsset('ALL')}
                 className="text-[11px] text-amber-400 hover:underline cursor-pointer"

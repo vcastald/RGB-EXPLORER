@@ -17,26 +17,48 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const isLightning =
+    transaction.paymentType === 'lightning' ||
+    transaction.asset === 'BTC_LN' ||
+    Boolean(transaction.paymentHash) ||
+    Boolean(transaction.channelId)
+
   const getAssetBadge = () => {
     switch (transaction.asset) {
       case 'USDT':
         return {
           label: 'USDT',
-          schema: 'RGB20',
+          schema: 'RGB20 (LN)',
           badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
           amountColor: 'text-emerald-400',
         }
       case 'XAUT':
         return {
           label: 'XAUT',
-          schema: 'RGB20',
+          schema: 'RGB20 (LN)',
           badgeColor: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
           amountColor: 'text-amber-300',
         }
-      case 'BTC':
+      case 'BTC_LN':
         return {
           label: 'BTC',
-          schema: transaction.channelId ? 'LN' : 'ON-CHAIN',
+          schema: '⚡ LN PAYMENT',
+          badgeColor: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+          amountColor: 'text-indigo-300',
+        }
+      case 'BTC':
+      default:
+        if (isLightning) {
+          return {
+            label: 'BTC',
+            schema: '⚡ LN PAYMENT',
+            badgeColor: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+            amountColor: 'text-indigo-300',
+          }
+        }
+        return {
+          label: 'BTC',
+          schema: '⛓️ ON-CHAIN',
           badgeColor: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
           amountColor: 'text-orange-400',
         }
@@ -55,12 +77,20 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
         <div className="flex min-w-0 items-center gap-2.5">
           {/* Asset Icon */}
           <div className="relative flex-shrink-0">
-            <AssetBadgeIcon asset={transaction.asset} className="h-8 w-8 text-xs" />
+            {isLightning && (transaction.asset === 'BTC' || transaction.asset === 'BTC_LN') ? (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-amber-500/20 to-indigo-500/20 text-amber-400 ring-1 ring-amber-400/30">
+                <LightningIcon className="h-4 w-4" />
+              </div>
+            ) : (
+              <AssetBadgeIcon asset={transaction.asset} className="h-8 w-8 text-xs" />
+            )}
             <span
-              className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-950 text-amber-400 ring-1 ring-slate-900"
-              title={transaction.channelId ? 'Lightning Network' : (transaction.asset === 'BTC' ? 'Bitcoin On-Chain' : 'RGB Protocol')}
+              className={`absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-950 ring-1 ring-slate-900 ${
+                isLightning ? 'text-amber-400' : 'text-orange-400'
+              }`}
+              title={isLightning ? 'Pagamento Canale Lightning' : 'Transazione Bitcoin On-Chain'}
             >
-              <LightningIcon className="h-2 w-2" />
+              {isLightning ? <LightningIcon className="h-2 w-2" /> : <span className="text-[8px] font-bold">₿</span>}
             </span>
           </div>
 
@@ -153,7 +183,7 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
             {transaction.paymentHash && (
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Payment Hash:</span>
+                  <span className="text-slate-400">⚡ Payment Hash (LN):</span>
                   <button
                     onClick={() => handleCopy(transaction.paymentHash!)}
                     className="text-[10px] text-amber-400 hover:underline cursor-pointer"
