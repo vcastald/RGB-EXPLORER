@@ -118,9 +118,9 @@ export function AgentChat() {
   }
 
   return (
-    <aside className="flex flex-col w-full lg:w-[360px] xl:w-[390px] flex-shrink-0 border-b lg:border-b-0 lg:border-r border-slate-800 bg-slate-900/50 backdrop-blur-md">
+    <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl shadow-black/20 backdrop-blur-sm">
       {/* Chat Header */}
-      <div className="flex items-center justify-between border-b border-slate-800/80 p-4">
+      <div className="flex items-center justify-between border-b border-slate-800/80 p-3.5 sm:p-4">
         <div className="flex items-center gap-3">
           <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-500 p-0.5 shadow-md shadow-indigo-500/10">
             <div className="flex h-full w-full items-center justify-center rounded-[10px] bg-slate-950 text-amber-400">
@@ -187,7 +187,7 @@ export function AgentChat() {
       {/* Messages Scroll Area */}
       <div
         aria-live="polite"
-        className="flex-1 space-y-3.5 overflow-y-auto p-4 custom-scrollbar max-h-[500px] lg:max-h-[calc(100vh-270px)] min-h-[320px]"
+        className="flex-1 min-h-0 space-y-3.5 overflow-y-auto p-3.5 sm:p-4 custom-scrollbar"
       >
         {messages.map((msg) => (
           <div
@@ -271,7 +271,7 @@ export function AgentChat() {
             : 'Connected via API • Local model'}
         </p>
       </div>
-    </aside>
+    </div>
   )
 }
 
