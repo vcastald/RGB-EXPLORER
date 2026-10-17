@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Transaction, AssetType, Denomination } from '../types/transaction'
+import { AgentChat } from './AgentChat'
 import { TransactionList } from './TransactionList'
 import { AssetPieChart } from './AssetPieChart'
 import { MarketQuotes } from './MarketQuotes'
@@ -45,7 +46,7 @@ export function Dashboard({
   } = useFrame(5 * 60 * 1000)
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
       {/* Node Alert if Offline */}
       {nodeOnline === false && (
         <div className="mb-6 flex items-center justify-between rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-300">
@@ -185,10 +186,19 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* Central Section: Scrollable Transaction List on the Left, Pie Chart + Quotes on the Right */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12 items-start">
-        {/* Left Column: Smaller scrollable transaction list */}
-        <div className="xl:col-span-7">
+      {/* Central Section: 3 equal-height columns on desktop:
+          Col 1: Agent Chat
+          Col 2: Scrollable Transaction List
+          Col 3: Asset Pie Chart + Kaleido Market Quotes
+      */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3 xl:gap-6 items-stretch">
+        {/* Column 1: Agent Chat */}
+        <div className="h-[600px] lg:h-[740px]">
+          <AgentChat />
+        </div>
+
+        {/* Column 2: Transaction List */}
+        <div className="h-[600px] lg:h-[740px]">
           <TransactionList
             transactions={transactions}
             selectedAsset={selectedAsset}
@@ -197,24 +207,27 @@ export function Dashboard({
           />
         </div>
 
-        {/* Right Column: Pie Chart with Asset Totals, followed by Kaleido Quotes */}
-        <div className="xl:col-span-5 space-y-6">
-          <AssetPieChart
-            transactions={transactions}
-            selectedAsset={selectedAsset}
-            onSelectAsset={setSelectedAsset}
-            denomination={denomination}
-            loading={transactionsLoading}
-            quotes={quotes}
-          />
+        {/* Column 3: Pie Chart + Market Quotes */}
+        <div className="flex h-auto flex-col gap-4 lg:h-[740px]">
+          <div className="min-h-[380px] lg:min-h-0 lg:flex-[1.15]">
+            <AssetPieChart
+              transactions={transactions}
+              selectedAsset={selectedAsset}
+              onSelectAsset={setSelectedAsset}
+              denomination={denomination}
+              loading={transactionsLoading}
+              quotes={quotes}
+            />
+          </div>
 
-          {/* Quotes Area below Pie Chart */}
-          <MarketQuotes
-            quotes={quotes}
-            loading={quotesLoading}
-            lastUpdated={quotesLastUpdated}
-            onRefresh={refreshQuotes}
-          />
+          <div className="min-h-[320px] lg:min-h-0 lg:flex-1">
+            <MarketQuotes
+              quotes={quotes}
+              loading={quotesLoading}
+              lastUpdated={quotesLastUpdated}
+              onRefresh={refreshQuotes}
+            />
+          </div>
         </div>
       </div>
     </div>

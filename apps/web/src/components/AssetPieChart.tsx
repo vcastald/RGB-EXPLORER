@@ -154,7 +154,7 @@ export function AssetPieChart({
   const activeFocusItem = stats.assets.find((a) => a.asset === activeFocusAsset)
 
   return (
-    <div className="flex h-full flex-col justify-between rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-xl shadow-black/20 backdrop-blur-sm">
+    <div className="flex h-full flex-col justify-between overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 p-4 shadow-xl shadow-black/20 backdrop-blur-sm">
       {/* Header */}
       <div>
         <div className="flex items-center justify-between">
@@ -172,9 +172,9 @@ export function AssetPieChart({
 
       {loading ? (
         /* Loading Skeleton */
-        <div className="my-4 flex flex-col items-center justify-center py-4 animate-pulse">
-          <div className="relative flex items-center justify-center h-[200px] w-[200px]">
-            <div className="h-32 w-32 rounded-full border-4 border-slate-800 border-t-amber-400 animate-spin" />
+        <div className="my-2 flex flex-col items-center justify-center py-2 animate-pulse">
+          <div className="relative flex items-center justify-center h-[160px] w-[160px]">
+            <div className="h-28 w-28 rounded-full border-4 border-slate-800 border-t-amber-400 animate-spin" />
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Loading</span>
               <span className="text-xs font-semibold text-slate-300">Dati dal nodo…</span>
@@ -205,8 +205,8 @@ export function AssetPieChart({
       ) : (
         <>
           {/* Donut Chart Center Graphic */}
-          <div className="relative my-4 flex items-center justify-center">
-            <svg width="200" height="200" viewBox="0 0 200 200" className="transform -rotate-90">
+          <div className="relative my-2 flex items-center justify-center">
+            <svg width="155" height="155" viewBox="0 0 200 200" className="transform -rotate-90">
               {/* Background circle track */}
               <circle
                 cx="100"
@@ -249,28 +249,28 @@ export function AssetPieChart({
             </svg>
 
             {/* Center label inside Donut */}
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center px-2">
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center px-1">
               {activeFocusItem ? (
                 <>
-                  <span className="text-[11px] font-semibold text-slate-400">
+                  <span className="text-[10px] font-semibold text-slate-400">
                     {activeFocusItem.asset}
                   </span>
-                  <span className="text-base font-bold text-white">
+                  <span className="text-sm font-bold text-white">
                     {formatPercent(activeFocusItem.percent)}
                   </span>
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[9px] text-slate-400">
                     ~{formatConverted(activeFocusItem.convertedValue, denomination)}
                   </span>
                 </>
               ) : (
                 <>
-                  <span className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">
+                  <span className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase">
                     Totale ({denomination})
                   </span>
-                  <span className="text-base sm:text-lg font-bold text-white truncate max-w-[140px]">
+                  <span className="text-sm sm:text-base font-bold text-white truncate max-w-[120px]">
                     {formatConverted(stats.totalConverted, denomination)}
                   </span>
-                  <span className="text-[10px] text-emerald-400 font-medium">
+                  <span className="text-[9px] text-emerald-400 font-medium">
                     {transactions.length} pagamenti
                   </span>
                 </>
@@ -279,7 +279,7 @@ export function AssetPieChart({
           </div>
 
           {/* Legend & Breakdown per Asset */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {stats.assets.map((item) => {
               const isSelected = selectedAsset === item.asset
               return (
@@ -288,16 +288,16 @@ export function AssetPieChart({
                   onClick={() => onSelectAsset(isSelected ? 'ALL' : item.asset)}
                   onMouseEnter={() => setHoveredAsset(item.asset)}
                   onMouseLeave={() => setHoveredAsset(null)}
-                  className={`flex cursor-pointer items-center justify-between rounded-xl border p-2.5 transition-all ${
+                  className={`flex cursor-pointer items-center justify-between rounded-xl border px-2.5 py-1.5 transition-all ${
                     isSelected
                       ? 'border-amber-400/50 bg-slate-800/90 shadow-md'
                       : 'border-slate-800/80 bg-slate-950/40 hover:border-slate-700 hover:bg-slate-800/40'
                   }`}
                 >
                   {/* Asset Name & Color Pill */}
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2">
                     <span
-                      className="h-3 w-3 rounded-full flex-shrink-0"
+                      className="h-2.5 w-2.5 rounded-full flex-shrink-0"
                       style={{ backgroundColor: item.color }}
                     />
                     <div>
@@ -305,7 +305,7 @@ export function AssetPieChart({
                         <span className="text-xs font-bold text-white">{item.asset}</span>
                         <span className="text-[10px] text-slate-400">({item.name})</span>
                       </div>
-                      <div className="text-[11px] font-mono text-slate-400">
+                      <div className="text-[10px] font-mono text-slate-400">
                         {item.protocol}
                       </div>
                     </div>
@@ -330,10 +330,10 @@ export function AssetPieChart({
 
           {/* Reset selection button if filtered */}
           {selectedAsset !== 'ALL' && (
-            <div className="mt-3 text-center">
+            <div className="mt-1.5 text-center">
               <button
                 onClick={() => onSelectAsset('ALL')}
-                className="text-xs text-amber-400 hover:underline cursor-pointer"
+                className="text-[11px] text-amber-400 hover:underline cursor-pointer"
               >
                 ← Mostra tutti gli asset nella lista
               </button>

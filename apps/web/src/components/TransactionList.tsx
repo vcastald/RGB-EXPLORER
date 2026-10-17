@@ -124,7 +124,7 @@ export function TransactionList({
       </div>
 
       {/* Scrollable List Container */}
-      <div className="flex-1 max-h-[460px] overflow-y-auto divide-y divide-slate-800/60 custom-scrollbar">
+      <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-800/60 custom-scrollbar">
         {loading ? (
           <div className="divide-y divide-slate-800/40 animate-pulse">
             {[1, 2, 3, 4, 5].map((i) => (

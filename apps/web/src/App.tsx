@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Header } from './components/Header'
 import { Dashboard } from './components/Dashboard'
-import { AgentChat } from './components/AgentChat'
 import sampleTransactionsData from './data/transactions.json'
 import { Transaction, Denomination } from './types/transaction'
 import { useNodeStatus } from './hooks/useNodeStatus'
@@ -188,20 +187,16 @@ export default function App() {
         onToggleTheme={toggleTheme}
       />
       
-      {/* 2-Column App Canvas: Left: Agent Chat UI, Right: Shifted Dashboard */}
-      <main className="flex-1 flex flex-col lg:flex-row min-w-0">
-        <AgentChat />
-        
-        <div className="flex-1 min-w-0 overflow-y-auto">
-          <Dashboard
-            transactions={transactions}
-            transactionsLoading={transactionsLoading}
-            nodeOnline={isOnline}
-            depositAddress={depositAddress}
-            denomination={denomination}
-            onDenominationChange={setDenomination}
-          />
-        </div>
+      {/* Main Dashboard Canvas */}
+      <main className="flex-1 min-w-0">
+        <Dashboard
+          transactions={transactions}
+          transactionsLoading={transactionsLoading}
+          nodeOnline={isOnline}
+          depositAddress={depositAddress}
+          denomination={denomination}
+          onDenominationChange={setDenomination}
+        />
       </main>
 
       <footer className="border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-400">
