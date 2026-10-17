@@ -41,45 +41,71 @@ Open http://127.0.0.1:5173 (or `WEB_PORT` from `.env`). Vite proxies `/api` to F
 
 ```bash
 npm run typecheck  # check both workspaces
-npm test           # API smoke test
+npm test           # API and merchant-script tests
 npm run build      # frontend bundle in apps/web/dist
 ```
 
 Tailwind CSS v4 is configured via the Vite plugin and `apps/web/src/style.css`. The frontend and backend run as separate processes; production hosting/proxy configuration is not included.
 
-## Local Mutinynet wallet (one per developer)
+## BTC Lightning on Mutinynet
 
-Requires Docker Desktop (with Compose) and Node.js 22+. Copy `.env.example` to `.env` first (if you haven't already). The pinned KaleidoSwap 0.10.1 image supports both Linux amd64 and arm64 through Docker's multi-platform image index. On a new clone:
+Requires Docker Desktop, Node.js 22+, and **Mutinynet test BTC**. This is a local test wallet, not a production payment service. Setup uses KaleidoSDK and the Docker RGB Lightning Node; it does not use the Kaleido CLI.
+
+### 1. Start the wallet (once per machine)
 
 ```bash
 npm install
-npm run node:setup
+cp .env.example .env        # first time only
+npm run node:setup          # creates wallet once; later runs unlock the same wallet
+npm run node:status
 ```
 
-This starts one isolated RGB Lightning node and initializes **one new wallet per machine**. Re-running `npm run node:setup` after a restart unlocks the **same** wallet; it will not initialize another if setup is incomplete. Check `npm run node:status`; stop without deleting wallet data using `npm run node:stop`.
+Back up `.local-node/mnemonic`, `.local-node/password`, and the full `.local-node/data` directory (copy node data while stopped). **The mnemonic alone cannot restore Lightning channel state.** Keep these files private; never expose the local node API or Fastify to the internet. `npm run node:stop` stops the node without deleting it. Do not delete `.local-node/` to troubleshoot.
 
-Fastify exposes `GET /api/node/status` (HTTP 200 with `{ "online": true, "pubkey": "..." }`, or HTTP 503 with `{ "online": false }`). Set `RGB_NODE_URL` on the API process to override the default node address.
-
-By default the node API is at `http://127.0.0.1:3901` (Lightning peer port `10091`). Change `RGB_NODE_PORT` and `RGB_PEER_PORT` in `.env` before creating a node if those ports are taken; Docker Compose, setup and Fastify read these values. `RGB_NODE_URL` optionally overrides Fastify's node target only. Do not change node ports after creating a wallet without first stopping the container and checking your setup. It runs on KaleidoSwap's Mutinynet (`SignetCustom`) with transaction sync via `https://esplora.signet.kaleidoswap.com`. It is **not yet connected to the Fastify UI** and has no funds or channels. Keep `.env` local; `.env.example` contains only safe defaults.
-
-**Back up immediately:** `.local-node/mnemonic` contains the secret recovery phrase; `.local-node/password` is the wallet password. Save these securely and never share or commit them. The mnemonic alone **cannot restore RGB/Lightning channel state**: preserve/back up the entire `.local-node/data` directory too, with the node stopped. `.local-node/` is gitignored. The node's unauthenticated API is bound to localhost only; do not expose it to the internet. This is a test-network setup, not a production wallet. Do not delete `.local-node/` to fix a setup error; inspect it first.
-
-## Read-only wallet overview API
-
-`GET /api/wallet/overview` returns `{ observedAt, network, height, pubkey, btc, assets, channels }`. `btc.vanilla` and `btc.colored` are satoshi balances (`settled`, `future`, `spendable`); `btc.cached: false` means the request syncs the BTC wallet to find recent deposits; the request can take longer if the indexer is slow. `assets` contains `{ schema, assetId, ticker, name, precision, balance }` and `channels` contains `{ channelId, peerPubkey, status, usable, capacitySat, localBalanceSat, assetId }`. When the node is unavailable or locked, it returns HTTP 503 `{ "error": "Node unavailable" }` (no partial snapshot). The endpoint does not include payment history yet.
-
-```bash
-curl http://127.0.0.1:3101/api/wallet/overview
-```
-
-Fastify decorates the app with a KaleidoSwap service from `apps/api/src/services/kaleido.ts`; the route lives in `apps/api/src/routes/wallet.ts`. Offline tests inject a fake service or SDK node; the curl command exercises the live node. No frontend changes are needed.
-
-## Generate a BTC deposit address
-
-With the Mutinynet node running and unlocked, request an address from the backend:
+If starting from an unfunded wallet, run the API with `npm run dev` and get a **Mutinynet on-chain** deposit address:
 
 ```bash
 curl -X POST http://127.0.0.1:3101/api/wallet/deposit-addresses
 ```
 
-Returns HTTP 201 `{ "address": "...", "network": "SignetCustom", "nodePubkey": "...", "createdAt": "..." }`. **Each POST requests a fresh address** from the same wallet; use it for the first deposit or for subsequent deposits. It does not contact a faucet, fund the wallet, or create a Lightning channel. Addresses are recorded in a local SQLite database (`APP_DB_PATH` in `.env`, default `.local-app/addresses.sqlite`). List recorded addresses for the current wallet with `curl http://127.0.0.1:3101/api/wallet/deposit-addresses`. This database is an app-side record, **not a wallet backup**: node-generated addresses may exist even if saving fails or the process crashes. HTTP 503 means the node is unavailable or not on Mutinynet; HTTP 500 on storage failure means do not blindly retry the request. Only send **Mutinynet test BTC** to these addresses; back up the wallet's node data before funding it. This local dev endpoint has no user authentication—do not expose Fastify publicly.
+Each POST derives a new address. Fund it with test BTC and wait for confirmation. Existing addresses: `GET /api/wallet/deposit-addresses`; balances: `GET /api/wallet/overview`. Neither funding nor starting the wallet creates a Lightning channel.
+
+### 2. Buy a BTC inbound channel (new wallet only)
+
+**If you already have a BTC order, skip this step.** Our current wallet already has a completed BTC order; rerunning setup will not buy a second channel.
+
+```bash
+npm run merchant:plan        # read-only fee estimate; not the final payment total
+npm run merchant:setup       # review proposal; type CREATE BTC ORDER to place one order
+npm run merchant:pay -- BTC  # review actual amount/address/expiry; type PAY BTC <amount> to pay
+```
+
+`merchant:setup` creates an order but **does not pay it**. `merchant:pay` makes an on-chain test-BTC payment only after typed approval; miner fee is extra. Do not pay an expired order, repeat a payment after an error/timeout, or delete `.local-app/merchant-orders.json` to try again: it holds the order ID, access token, and payment-attempt record. Investigate uncertain results first. The workflow is **BTC only**; it does not create RGB/USDT orders.
+
+### 3. Check readiness (safe to repeat)
+
+```bash
+npm run merchant:status     # order state plus actual BTC channel readiness
+# When API is running:
+curl http://127.0.0.1:3101/api/lightning/readiness
+```
+
+Look for BTC order `COMPLETED`, channel `ready: true` and `isUsable: true`, a connected peer, and positive **inbound** liquidity (API amounts are in **msat**). Order completion alone is not proof of readiness. On this wallet, a 1,000-sat inbound BTC payment was verified `Succeeded` on Mutinynet. For a new wallet, test an invoice paid by a **different Mutinynet Lightning wallet** before relying on receipts.
+
+With the API running, create a one-hour BTC invoice (1–40,000 sats):
+
+```bash
+curl -X POST 'http://127.0.0.1:3101/api/lightning/invoices' -H 'Content-Type: application/json' -d '{"amountSat":1000,"description":"test"}'
+```
+
+This POST creates a **new** invoice each time; save the returned `invoice` and pay it from another Mutinynet wallet. Check its status (replace the placeholder):
+
+```bash
+curl -X POST 'http://127.0.0.1:3101/api/lightning/invoices/status' -H 'Content-Type: application/json' -d '{"invoice":"PASTE_RETURNED_INVOICE_HERE"}'
+```
+
+Only `{"status":"Succeeded"}` proves receipt. These local endpoints have no authentication; do not expose the API publicly.
+
+The existing failed USDT order is retained in the private journal for refund tracking; `merchant:status` can show it. **Do not repay or retry it.**
+
+Ports and node/API URLs can be configured in `.env`. Keep `.env` private. The local Fastify API has no user authentication; do not publish it.

@@ -8,10 +8,14 @@
     "dev": "concurrently -k -n api,web -c blue,green \"npm run dev -w @rgb/api\" \"npm run dev -w @rgb/web\"",
     "build": "npm run build -w @rgb/web",
     "typecheck": "npm run typecheck --workspaces",
-    "test": "npm run test -w @rgb/api",
+    "test": "npm run test -w @rgb/api && node --test scripts/*.test.mjs",
     "node:setup": "node scripts/node-setup.mjs",
     "node:stop": "docker compose -f compose.node.yaml stop",
-    "node:status": "docker compose -f compose.node.yaml ps"
+    "node:status": "docker compose -f compose.node.yaml ps",
+    "merchant:plan": "node scripts/merchant-plan.mjs",
+    "merchant:setup": "node scripts/merchant-setup.mjs setup",
+    "merchant:status": "node scripts/merchant-setup.mjs status",
+    "merchant:pay": "node scripts/merchant-setup.mjs pay"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
