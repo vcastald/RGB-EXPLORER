@@ -88,7 +88,7 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
               className={`absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-950 ring-1 ring-slate-900 ${
                 isLightning ? 'text-amber-400' : 'text-orange-400'
               }`}
-              title={isLightning ? 'Pagamento Canale Lightning' : 'Transazione Bitcoin On-Chain'}
+              title={isLightning ? 'Lightning Channel Payment' : 'On-Chain Bitcoin Transaction'}
             >
               {isLightning ? <LightningIcon className="h-2 w-2" /> : <span className="text-[8px] font-bold">₿</span>}
             </span>
@@ -109,7 +109,7 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
 
             <div className="flex items-center gap-1.5 text-[11px] text-slate-400 truncate">
               <span className="font-mono text-slate-400">
-                da: {shortenIdentifier(transaction.sender.identifier, 8, 4)}
+                from: {shortenIdentifier(transaction.sender.identifier, 8, 4)}
               </span>
               {transaction.memo && (
                 <>
@@ -147,7 +147,7 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
         >
           <div className="space-y-1.5">
             <div>
-              <span className="text-slate-400">Mittente / ID: </span>
+              <span className="text-slate-400">Sender / ID: </span>
               <span className="font-mono text-slate-200 select-all break-all">
                 {transaction.sender.identifier}
               </span>
@@ -160,7 +160,7 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
                     onClick={() => handleCopy(transaction.txid!)}
                     className="text-[10px] text-amber-400 hover:underline cursor-pointer"
                   >
-                    {copied ? 'Copiato!' : 'Copia'}
+                    {copied ? 'Copied!' : 'Copy'}
                   </button>
                 </div>
                 <p className="font-mono text-slate-300 break-all select-all text-[10px]">
@@ -170,13 +170,13 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
             )}
             {transaction.blockHeight && (
               <div>
-                <span className="text-slate-400">Altezza Blocco: </span>
+                <span className="text-slate-400">Block Height: </span>
                 <span className="font-mono text-slate-200">#{transaction.blockHeight}</span>
               </div>
             )}
             {transaction.channelId && (
               <div>
-                <span className="text-slate-400">Canale: </span>
+                <span className="text-slate-400">Channel: </span>
                 <span className="font-mono text-slate-200">{transaction.channelId}</span>
               </div>
             )}
@@ -188,7 +188,7 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
                     onClick={() => handleCopy(transaction.paymentHash!)}
                     className="text-[10px] text-amber-400 hover:underline cursor-pointer"
                   >
-                    {copied ? 'Copiato!' : 'Copia'}
+                    {copied ? 'Copied!' : 'Copy'}
                   </button>
                 </div>
                 <p className="font-mono text-slate-300 break-all select-all text-[10px]">
@@ -197,7 +197,7 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
               </div>
             )}
             <div className="flex justify-between text-slate-400 pt-1 border-t border-slate-800/80">
-              <span>{new Date(transaction.timestamp).toLocaleString('it-IT')}</span>
+              <span>{new Date(transaction.timestamp).toLocaleString('en-US')}</span>
               {transaction.memo && <span className="italic text-slate-300">{transaction.memo}</span>}
             </div>
           </div>

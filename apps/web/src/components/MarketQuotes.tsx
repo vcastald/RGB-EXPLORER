@@ -24,9 +24,9 @@ export function MarketQuotes({
           </div>
           <div>
             <h3 className="text-sm font-bold text-white">
-              Quotazioni Kaleido Swap
+              Kaleido Swap Quotes
             </h3>
-            <p className="text-[11px] text-slate-400">Tassi di cambio per scambi atomici RGB / LN</p>
+            <p className="text-[11px] text-slate-400">Exchange rates for RGB / Lightning atomic swaps</p>
           </div>
         </div>
 
@@ -38,7 +38,7 @@ export function MarketQuotes({
           <button
             onClick={onRefresh}
             disabled={loading}
-            title="Aggiorna quotazioni"
+            title="Refresh market quotes"
             className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-800 bg-slate-950/60 text-xs text-slate-400 hover:text-white transition-all cursor-pointer disabled:opacity-50"
           >
             <span className={loading ? 'animate-spin' : ''}>↻</span>
@@ -69,7 +69,7 @@ export function MarketQuotes({
               </div>
             ))}
             <p className="text-center text-[10px] text-slate-400 py-1 font-mono">
-              Caricamento quotazioni dal backend...
+              Loading market quotes...
             </p>
           </div>
         ) : (
@@ -128,11 +128,11 @@ export function MarketQuotes({
 
       {/* Footer Info */}
       <div className="flex items-center justify-between border-t border-slate-800/60 pt-2 text-[10px] text-slate-400">
-        <span>Fonte: Kaleido SDK Maker</span>
+        <span>Source: Kaleido SDK Maker</span>
         <span>
           {lastUpdated
-            ? `Aggiornato alle ${lastUpdated.toLocaleTimeString('it-IT')}`
-            : 'In aggiornamento...'}
+            ? `Updated at ${lastUpdated.toLocaleTimeString('en-US')}`
+            : 'Updating...'}
         </span>
       </div>
     </div>

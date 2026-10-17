@@ -174,7 +174,7 @@ export default function App() {
               identifier: p.paymentHash,
               type: 'node',
             },
-            memo: p.memo || 'Pagamento Lightning Network',
+            memo: p.memo || 'Lightning Network payment',
           }))
         }
       }

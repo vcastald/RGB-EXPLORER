@@ -58,7 +58,7 @@ export function TransactionList({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-white sm:text-base">
-              Transazioni
+              Transactions
             </h3>
             <span className="flex items-center gap-1 rounded-full bg-amber-400/10 px-2 py-0.5 text-[10px] font-medium text-amber-400 ring-1 ring-amber-400/20">
               <LightningIcon className="h-2.5 w-2.5" />
@@ -67,7 +67,7 @@ export function TransactionList({
           </div>
 
           <span className="text-[11px] text-slate-400 font-mono">
-            {loading ? 'Caricamento…' : `${filteredTransactions.length} di ${transactions.length}`}
+            {loading ? 'Loading…' : `${filteredTransactions.length} of ${transactions.length}`}
           </span>
         </div>
 
@@ -80,7 +80,7 @@ export function TransactionList({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cerca per mittente o causale..."
+            placeholder="Search by sender or memo..."
             className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-1.5 pl-8 pr-7 text-xs text-slate-100 placeholder-slate-400 focus:border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/50"
           />
           {searchQuery && (
@@ -103,7 +103,7 @@ export function TransactionList({
                 : 'border border-slate-800 bg-slate-950/60 text-slate-400 hover:text-white'
             }`}
           >
-            Tutti
+            All
           </button>
 
           <button
@@ -172,7 +172,7 @@ export function TransactionList({
               </div>
             ))}
             <p className="text-center text-[10px] text-slate-400 py-3 font-mono">
-              Caricamento transazioni dal nodo...
+              Loading transactions from node...
             </p>
           </div>
         ) : filteredTransactions.length > 0 ? (
@@ -184,9 +184,9 @@ export function TransactionList({
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-800 text-slate-400">
               <SearchIcon className="h-5 w-5" />
             </div>
-            <h4 className="mt-2 text-xs font-semibold text-white">Nessun pagamento trovato</h4>
+            <h4 className="mt-2 text-xs font-semibold text-white">No transactions found</h4>
             <p className="mt-0.5 text-[11px] text-slate-400">
-              Prova a cambiare il filtro asset o il termine di ricerca.
+              Try changing the asset filter or search term.
             </p>
             <button
               onClick={() => {
@@ -195,7 +195,7 @@ export function TransactionList({
               }}
               className="mt-2 text-xs text-amber-400 hover:underline cursor-pointer"
             >
-              Azzera filtri
+              Reset filters
             </button>
           </div>
         )}
@@ -203,7 +203,7 @@ export function TransactionList({
 
       {/* Scroll indicator footer */}
       <div className="border-t border-slate-800/80 bg-slate-950/40 px-3.5 py-2 text-[10px] text-slate-400 flex justify-between items-center">
-        <span>Scrolla per visualizzare la cronologia</span>
+        <span>Scroll to view transaction history</span>
         <span className="font-mono text-emerald-400">● Live Updates</span>
       </div>
     </div>
