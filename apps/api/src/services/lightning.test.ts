@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { BitcoinNetwork, ChannelStatus } from 'kaleido-sdk/rln'
+import { BitcoinNetwork, ChannelStatus, InvoiceStatus } from 'kaleido-sdk/rln'
 import { LightningService } from './lightning.js'
 import type { LightningNodeReader } from './lightning.js'
 
@@ -14,6 +14,8 @@ function fakeNode(channels: Awaited<ReturnType<LightningNodeReader['listChannels
     }),
     listPeers: async () => ({ peers: [] }),
     listChannels: async () => ({ channels }),
+    createLNInvoice: async () => ({ invoice: 'lnbcrtinvoice' }),
+    getInvoiceStatus: async () => ({ status: InvoiceStatus.Pending }),
   }
 }
 
@@ -39,4 +41,20 @@ test('usable channel requires outbound balance, not merely capacity', async () =
   const ready = await service.getReadiness()
   assert.equal(ready.hasUsableOutbound, true)
   assert.equal(ready.channels[0].outboundMsat, 5000000)
+})
+
+test('BTC invoice requires usable BTC inbound capacity and passes exact millisats to SDK', async () => {
+  const channel = { channel_id: 'btc', peer_pubkey: 'peer', status: ChannelStatus.Opened,
+    is_usable: true, capacity_sat: 50000, outbound_balance_msat: 1000000,
+    inbound_balance_msat: 46240000, asset_id: null, asset_local_amount: null }
+  const node = fakeNode([channel])
+  const requests: unknown[] = []
+  node.createLNInvoice = async (body) => { requests.push(body); return { invoice: 'lnbcrtinvoice' } }
+  const service = new LightningService(node)
+  assert.deepEqual(await service.createBtcInvoice(1000, 'coffee'), { invoice: 'lnbcrtinvoice', amountSat: 1000, expirySec: 3600 })
+  assert.deepEqual(requests, [{ amt_msat: 1000000, expiry_sec: 3600, description: 'coffee' }])
+  await assert.rejects(service.createBtcInvoice(46000), /Insufficient/)
+  assert.equal(requests.length, 1)
+  node.listChannels = async () => ({ channels: [{ ...channel, asset_id: 'rgb:usdt' }] })
+  await assert.rejects(service.createBtcInvoice(1000), /Insufficient/)
 })

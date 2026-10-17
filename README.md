@@ -90,7 +90,21 @@ npm run merchant:status     # order state plus actual BTC channel readiness
 curl http://127.0.0.1:3101/api/lightning/readiness
 ```
 
-Look for BTC order `COMPLETED`, channel `ready: true` and `isUsable: true`, a connected peer, and positive **inbound** liquidity (API amounts are in **msat**). Order completion alone is not proof of readiness. Our BTC channel last passed these checks, but you must still test a small BTC Lightning invoice paid by a **different Mutinynet Lightning wallet** before relying on receipts. Invoice creation and payment-status backend endpoints are **not implemented yet**.
+Look for BTC order `COMPLETED`, channel `ready: true` and `isUsable: true`, a connected peer, and positive **inbound** liquidity (API amounts are in **msat**). Order completion alone is not proof of readiness. On this wallet, a 1,000-sat inbound BTC payment was verified `Succeeded` on Mutinynet. For a new wallet, test an invoice paid by a **different Mutinynet Lightning wallet** before relying on receipts.
+
+With the API running, create a one-hour BTC invoice (1–40,000 sats):
+
+```bash
+curl -X POST 'http://127.0.0.1:3101/api/lightning/invoices' -H 'Content-Type: application/json' -d '{"amountSat":1000,"description":"test"}'
+```
+
+This POST creates a **new** invoice each time; save the returned `invoice` and pay it from another Mutinynet wallet. Check its status (replace the placeholder):
+
+```bash
+curl -X POST 'http://127.0.0.1:3101/api/lightning/invoices/status' -H 'Content-Type: application/json' -d '{"invoice":"PASTE_RETURNED_INVOICE_HERE"}'
+```
+
+Only `{"status":"Succeeded"}` proves receipt. These local endpoints have no authentication; do not expose the API publicly.
 
 The existing failed USDT order is retained in the private journal for refund tracking; `merchant:status` can show it. **Do not repay or retry it.**
 

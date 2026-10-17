@@ -1,4 +1,5 @@
-// Guided order creation ONLY. Never pays an order or starts a replacement after an uncertain result.
+// BTC-only order workflow. Creation and payment are separate, interactive actions.
+// Never automatically retry an uncertain submission.
 import { KaleidoClient } from 'kaleido-sdk'
 import { loadEnvFile } from 'node:process'
 import { existsSync, mkdirSync, openSync, closeSync, unlinkSync } from 'node:fs'
@@ -51,7 +52,7 @@ async function showStatus(client, journal, includeHistorical = true) {
       console.log(JSON.stringify({ btcNodeChannel: live ? { status: live.status, ready: live.ready,
         isUsable: live.is_usable, inboundBalanceMsat: live.inbound_balance_msat,
         channelId: live.channel_id } : null,
-        note: live?.ready && live?.is_usable ? 'Channel usable; test a small BTC invoice before relying on it.'
+        note: live?.ready && live?.is_usable ? 'Channel usable; confirm receipts with invoice status or node payment history.'
           : 'BTC channel not yet usable. Do not treat order COMPLETED as proof of readiness.' }, null, 2))
     }
   }
