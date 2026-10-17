@@ -5,6 +5,7 @@ import { createKaleidoService } from './services/kaleido.js'
 import { registerWalletRoutes } from './routes/wallet.js'
 import { registerQuotesRoutes } from './routes/quotes.js'
 import type { WalletService } from './services/kaleido.js'
+import { registerChatRoutes } from './routes/chat.js'
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -27,6 +28,8 @@ export function createApp(options: { nodeUrl?: string; fetchNode?: typeof fetch;
 
   registerWalletRoutes(app)
   registerQuotesRoutes(app)
+
+  registerChatRoutes(app)
 
   app.get('/api/node/status', async (_request, reply) => {
     try {
