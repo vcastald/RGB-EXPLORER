@@ -1,29 +1,46 @@
 import { useState, useMemo } from 'react'
 import { Transaction, AssetType, Denomination } from '../types/transaction'
 import { formatAmount } from '../utils/formatters'
+import type { MarketQuote } from '../hooks/useFrame'
 
 interface AssetPieChartProps {
   transactions: Transaction[]
   selectedAsset: 'ALL' | AssetType
   onSelectAsset: (asset: 'ALL' | AssetType) => void
   denomination: Denomination
+  loading?: boolean
+  quotes?: MarketQuote[]
 }
 
-// Estimated market rates in USD for conversions
-const RATES_IN_USD: Record<AssetType, number> = {
+// Fallback rates in USD if quotes are not yet loaded
+const DEFAULT_RATES_IN_USD: Record<AssetType, number> = {
   USDT: 1.0,
-  XAUT: 2680.0, // 1 oz Gold in USD
-  BTC: 67500.0,  // 1 BTC in USD
+  XAUT: 2680.0,
+  BTC: 80000.0,
 }
 
 function formatConverted(val: number, denomination: Denomination): string {
   if (denomination === 'USD') {
+    if (val === 0) return '$0'
+    if (val < 10) {
+      return '$' + val.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    }
     return '$' + Math.round(val).toLocaleString('it-IT')
   }
+  if (val === 0) return '0 BTC'
   if (val < 0.0001 && val > 0) {
+    return val.toFixed(8) + ' BTC'
+  }
+  if (val < 1) {
     return val.toFixed(6) + ' BTC'
   }
   return val.toFixed(4) + ' BTC'
+}
+
+function formatPercent(pct: number): string {
+  if (pct === 0) return '0.0%'
+  if (pct < 0.1) return pct.toFixed(2) + '%'
+  return pct.toFixed(1) + '%'
 }
 
 export function AssetPieChart({
@@ -31,11 +48,29 @@ export function AssetPieChart({
   selectedAsset,
   onSelectAsset,
   denomination,
+  loading = false,
+  quotes,
 }: AssetPieChartProps) {
   const [hoveredAsset, setHoveredAsset] = useState<AssetType | null>(null)
 
   const stats = useMemo(() => {
-    const settled = transactions.filter((t) => t.status === 'settled')
+    // Dynamic market rates from Kaleido quotes if available
+    const btcUsdtQuote = quotes?.find((q) => q.pair === 'BTC/USDT')
+    const btcPrice = btcUsdtQuote?.price && btcUsdtQuote.price > 0 ? btcUsdtQuote.price : DEFAULT_RATES_IN_USD.BTC
+
+    const usdtXautQuote = quotes?.find((q) => q.pair === 'USDT/XAUT')
+    const xautPrice =
+      usdtXautQuote?.inversePrice && usdtXautQuote.inversePrice > 0
+        ? usdtXautQuote.inversePrice
+        : DEFAULT_RATES_IN_USD.XAUT
+
+    const rates: Record<AssetType, number> = {
+      USDT: 1.0,
+      XAUT: xautPrice,
+      BTC: btcPrice,
+    }
+
+    const settled = transactions.filter((t) => t.status === 'settled' || !t.status)
 
     const usdtAmount = settled
       .filter((t) => t.asset === 'USDT')
@@ -43,52 +78,71 @@ export function AssetPieChart({
     const xautAmount = settled
       .filter((t) => t.asset === 'XAUT')
       .reduce((sum, t) => sum + t.amount, 0)
-    const btcAmount = settled
-      .filter((t) => t.asset === 'BTC')
-      .reduce((sum, t) => sum + t.amount, 0)
 
-    const usdtUsd = usdtAmount * RATES_IN_USD.USDT
-    const xautUsd = xautAmount * RATES_IN_USD.XAUT
-    const btcUsd = btcAmount * RATES_IN_USD.BTC
+    // Calculate BTC from backend transactions: incoming positive, outgoing negative
+    const btcTxs = transactions.filter((t) => t.asset === 'BTC' && (t.status === 'settled' || !t.status))
+    const btcAmount = Math.max(
+      0,
+      btcTxs.reduce((sum, t) => sum + (t.direction === 'outgoing' ? -t.amount : t.amount), 0)
+    )
+
+    const usdtUsd = usdtAmount * rates.USDT
+    const xautUsd = xautAmount * rates.XAUT
+    const btcUsd = btcAmount * rates.BTC
     const totalUsd = usdtUsd + xautUsd + btcUsd || 1
-    const totalConverted = denomination === 'USD' ? totalUsd : totalUsd / RATES_IN_USD.BTC
+    const totalConverted = denomination === 'USD' ? totalUsd : totalUsd / rates.BTC
+
+    const rawAssets = [
+      {
+        asset: 'USDT' as AssetType,
+        name: 'Tether USD',
+        protocol: 'RGB20 (LN)',
+        amount: usdtAmount,
+        convertedValue: denomination === 'USD' ? usdtUsd : usdtUsd / rates.BTC,
+        percent: (usdtUsd / totalUsd) * 100,
+        color: '#10b981', // emerald-500
+        hoverColor: '#34d399',
+      },
+      {
+        asset: 'XAUT' as AssetType,
+        name: 'Tether Gold',
+        protocol: 'RGB20 (LN)',
+        amount: xautAmount,
+        convertedValue: denomination === 'USD' ? xautUsd : xautUsd / rates.BTC,
+        percent: (xautUsd / totalUsd) * 100,
+        color: '#fbbf24', // amber-400
+        hoverColor: '#fcd34d',
+      },
+      {
+        asset: 'BTC' as AssetType,
+        name: 'Bitcoin Native',
+        protocol: 'On-Chain (Node)',
+        amount: btcAmount,
+        convertedValue: denomination === 'USD' ? btcUsd : btcAmount,
+        percent: (btcUsd / totalUsd) * 100,
+        color: '#f97316', // orange-500
+        hoverColor: '#fb923c',
+      },
+    ]
+
+    // Visual min-slice percentage so tiny BTC amounts (e.g. 0.0001 BTC) remain visible and clickable on SVG donut
+    const rawSumWithMin = rawAssets.reduce(
+      (sum, a) => sum + (a.percent > 0 ? Math.max(a.percent, 3.5) : 0),
+      0
+    )
+    const assets = rawAssets.map((a) => ({
+      ...a,
+      visualPercent:
+        rawSumWithMin > 0 && a.percent > 0
+          ? (Math.max(a.percent, 3.5) / rawSumWithMin) * 100
+          : 0,
+    }))
 
     return {
       totalConverted,
-      assets: [
-        {
-          asset: 'USDT' as AssetType,
-          name: 'Tether USD',
-          protocol: 'RGB20 (LN)',
-          amount: usdtAmount,
-          convertedValue: denomination === 'USD' ? usdtUsd : usdtUsd / RATES_IN_USD.BTC,
-          percent: (usdtUsd / totalUsd) * 100,
-          color: '#10b981', // emerald-500
-          hoverColor: '#34d399',
-        },
-        {
-          asset: 'XAUT' as AssetType,
-          name: 'Tether Gold',
-          protocol: 'RGB20 (LN)',
-          amount: xautAmount,
-          convertedValue: denomination === 'USD' ? xautUsd : xautUsd / RATES_IN_USD.BTC,
-          percent: (xautUsd / totalUsd) * 100,
-          color: '#fbbf24', // amber-400
-          hoverColor: '#fcd34d',
-        },
-        {
-          asset: 'BTC' as AssetType,
-          name: 'Bitcoin Native',
-          protocol: 'Lightning',
-          amount: btcAmount,
-          convertedValue: denomination === 'USD' ? btcUsd : btcAmount,
-          percent: (btcUsd / totalUsd) * 100,
-          color: '#f97316', // orange-500
-          hoverColor: '#fb923c',
-        },
-      ],
+      assets,
     }
-  }, [transactions, denomination])
+  }, [transactions, denomination, quotes])
 
   // Donut SVG parameters
   const radius = 64
@@ -112,145 +166,182 @@ export function AssetPieChart({
           </span>
         </div>
         <p className="mt-0.5 text-xs text-slate-400">
-          Quota del volume incassato sui canali Lightning RGB
+          Ripartizione fondi tra canali Lightning RGB e nodo Bitcoin On-Chain
         </p>
       </div>
 
-      {/* Donut Chart Center Graphic */}
-      <div className="relative my-4 flex items-center justify-center">
-        <svg width="200" height="200" viewBox="0 0 200 200" className="transform -rotate-90">
-          {/* Background circle track */}
-          <circle
-            cx="100"
-            cy="100"
-            r={radius}
-            fill="transparent"
-            stroke="#1e293b"
-            strokeWidth={strokeWidth}
-          />
+      {loading ? (
+        /* Loading Skeleton */
+        <div className="my-4 flex flex-col items-center justify-center py-4 animate-pulse">
+          <div className="relative flex items-center justify-center h-[200px] w-[200px]">
+            <div className="h-32 w-32 rounded-full border-4 border-slate-800 border-t-amber-400 animate-spin" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Loading</span>
+              <span className="text-xs font-semibold text-slate-300">Dati dal nodo…</span>
+            </div>
+          </div>
 
-          {/* Slices */}
-          {stats.assets.map((item) => {
-            const strokeDasharray = `${(item.percent * circumference) / 100} ${circumference}`
-            const strokeDashoffset = -((accumulatedPercent * circumference) / 100)
-            accumulatedPercent += item.percent
-
-            const isSelected = selectedAsset === item.asset
-            const isHovered = hoveredAsset === item.asset
-
-            return (
+          <div className="w-full space-y-2 mt-4">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between rounded-xl border border-slate-800/80 bg-slate-950/40 p-2.5"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="h-3 w-3 rounded-full bg-slate-800" />
+                  <div className="space-y-1">
+                    <div className="h-3 w-16 rounded bg-slate-800" />
+                    <div className="h-2 w-20 rounded bg-slate-800/60" />
+                  </div>
+                </div>
+                <div className="space-y-1 text-right">
+                  <div className="h-3.5 w-20 rounded bg-slate-800 ml-auto" />
+                  <div className="h-2 w-12 rounded bg-slate-800/60 ml-auto" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Donut Chart Center Graphic */}
+          <div className="relative my-4 flex items-center justify-center">
+            <svg width="200" height="200" viewBox="0 0 200 200" className="transform -rotate-90">
+              {/* Background circle track */}
               <circle
-                key={item.asset}
                 cx="100"
                 cy="100"
                 r={radius}
                 fill="transparent"
-                stroke={isHovered ? item.hoverColor : item.color}
-                strokeWidth={isHovered || isSelected ? strokeWidth + 4 : strokeWidth}
-                strokeDasharray={strokeDasharray}
-                strokeDashoffset={strokeDashoffset}
-                className="cursor-pointer transition-all duration-300"
-                onMouseEnter={() => setHoveredAsset(item.asset)}
-                onMouseLeave={() => setHoveredAsset(null)}
-                onClick={() =>
-                  onSelectAsset(selectedAsset === item.asset ? 'ALL' : item.asset)
-                }
+                stroke="var(--color-slate-800)"
+                strokeWidth={strokeWidth}
               />
-            )
-          })}
-        </svg>
 
-        {/* Center label inside Donut */}
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center px-2">
-          {activeFocusItem ? (
-            <>
-              <span className="text-[11px] font-semibold text-slate-400">
-                {activeFocusItem.asset}
-              </span>
-              <span className="text-base font-bold text-white">
-                {activeFocusItem.percent.toFixed(1)}%
-              </span>
-              <span className="text-[10px] text-slate-400">
-                ~{formatConverted(activeFocusItem.convertedValue, denomination)}
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">
-                Totale ({denomination})
-              </span>
-              <span className="text-base sm:text-lg font-bold text-white truncate max-w-[140px]">
-                {formatConverted(stats.totalConverted, denomination)}
-              </span>
-              <span className="text-[10px] text-emerald-400 font-medium">
-                {transactions.length} pagamenti
-              </span>
-            </>
-          )}
-        </div>
-      </div>
+              {/* Slices */}
+              {stats.assets.map((item) => {
+                const strokeDasharray = `${(item.visualPercent * circumference) / 100} ${circumference}`
+                const strokeDashoffset = -((accumulatedPercent * circumference) / 100)
+                accumulatedPercent += item.visualPercent
 
-      {/* Legend & Breakdown per Asset */}
-      <div className="space-y-2">
-        {stats.assets.map((item) => {
-          const isSelected = selectedAsset === item.asset
-          return (
-            <div
-              key={item.asset}
-              onClick={() => onSelectAsset(isSelected ? 'ALL' : item.asset)}
-              onMouseEnter={() => setHoveredAsset(item.asset)}
-              onMouseLeave={() => setHoveredAsset(null)}
-              className={`flex cursor-pointer items-center justify-between rounded-xl border p-2.5 transition-all ${
-                isSelected
-                  ? 'border-amber-400/50 bg-slate-800/90 shadow-md'
-                  : 'border-slate-800/80 bg-slate-950/40 hover:border-slate-700 hover:bg-slate-800/40'
-              }`}
-            >
-              {/* Asset Name & Color Pill */}
-              <div className="flex items-center gap-2.5">
-                <span
-                  className="h-3 w-3 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: item.color }}
-                />
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-white">{item.asset}</span>
-                    <span className="text-[10px] text-slate-400">({item.name})</span>
-                  </div>
-                  <div className="text-[11px] font-mono text-slate-400">
-                    {item.protocol}
-                  </div>
-                </div>
-              </div>
+                const isSelected = selectedAsset === item.asset
+                const isHovered = hoveredAsset === item.asset
 
-              {/* Amount & Converted Value */}
-              <div className="text-right">
-                <div className="text-xs font-bold text-slate-100">
-                  {formatAmount(item.amount, item.asset)}
-                </div>
-                <div className="text-[10px] text-slate-400">
-                  <span className="font-semibold text-slate-300">
-                    {item.percent.toFixed(1)}%
-                  </span>{' '}
-                  (~{formatConverted(item.convertedValue, denomination)})
-                </div>
-              </div>
+                return (
+                  <circle
+                    key={item.asset}
+                    cx="100"
+                    cy="100"
+                    r={radius}
+                    fill="transparent"
+                    stroke={isHovered ? item.hoverColor : item.color}
+                    strokeWidth={isHovered || isSelected ? strokeWidth + 4 : strokeWidth}
+                    strokeDasharray={strokeDasharray}
+                    strokeDashoffset={strokeDashoffset}
+                    className="cursor-pointer transition-all duration-300"
+                    onMouseEnter={() => setHoveredAsset(item.asset)}
+                    onMouseLeave={() => setHoveredAsset(null)}
+                    onClick={() =>
+                      onSelectAsset(selectedAsset === item.asset ? 'ALL' : item.asset)
+                    }
+                  />
+                )
+              })}
+            </svg>
+
+            {/* Center label inside Donut */}
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center px-2">
+              {activeFocusItem ? (
+                <>
+                  <span className="text-[11px] font-semibold text-slate-400">
+                    {activeFocusItem.asset}
+                  </span>
+                  <span className="text-base font-bold text-white">
+                    {formatPercent(activeFocusItem.percent)}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    ~{formatConverted(activeFocusItem.convertedValue, denomination)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">
+                    Totale ({denomination})
+                  </span>
+                  <span className="text-base sm:text-lg font-bold text-white truncate max-w-[140px]">
+                    {formatConverted(stats.totalConverted, denomination)}
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-medium">
+                    {transactions.length} pagamenti
+                  </span>
+                </>
+              )}
             </div>
-          )
-        })}
-      </div>
+          </div>
 
-      {/* Reset selection button if filtered */}
-      {selectedAsset !== 'ALL' && (
-        <div className="mt-3 text-center">
-          <button
-            onClick={() => onSelectAsset('ALL')}
-            className="text-xs text-amber-400 hover:underline cursor-pointer"
-          >
-            ← Mostra tutti gli asset nella lista
-          </button>
-        </div>
+          {/* Legend & Breakdown per Asset */}
+          <div className="space-y-2">
+            {stats.assets.map((item) => {
+              const isSelected = selectedAsset === item.asset
+              return (
+                <div
+                  key={item.asset}
+                  onClick={() => onSelectAsset(isSelected ? 'ALL' : item.asset)}
+                  onMouseEnter={() => setHoveredAsset(item.asset)}
+                  onMouseLeave={() => setHoveredAsset(null)}
+                  className={`flex cursor-pointer items-center justify-between rounded-xl border p-2.5 transition-all ${
+                    isSelected
+                      ? 'border-amber-400/50 bg-slate-800/90 shadow-md'
+                      : 'border-slate-800/80 bg-slate-950/40 hover:border-slate-700 hover:bg-slate-800/40'
+                  }`}
+                >
+                  {/* Asset Name & Color Pill */}
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className="h-3 w-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-white">{item.asset}</span>
+                        <span className="text-[10px] text-slate-400">({item.name})</span>
+                      </div>
+                      <div className="text-[11px] font-mono text-slate-400">
+                        {item.protocol}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Amount & Converted Value */}
+                  <div className="text-right">
+                    <div className="text-xs font-bold text-slate-100">
+                      {formatAmount(item.amount, item.asset)}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      <span className="font-semibold text-slate-300">
+                        {formatPercent(item.percent)}
+                      </span>{' '}
+                      (~{formatConverted(item.convertedValue, denomination)})
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Reset selection button if filtered */}
+          {selectedAsset !== 'ALL' && (
+            <div className="mt-3 text-center">
+              <button
+                onClick={() => onSelectAsset('ALL')}
+                className="text-xs text-amber-400 hover:underline cursor-pointer"
+              >
+                ← Mostra tutti gli asset nella lista
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
 }
+

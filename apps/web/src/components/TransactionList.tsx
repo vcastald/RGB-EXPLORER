@@ -7,12 +7,14 @@ interface TransactionListProps {
   transactions: Transaction[]
   selectedAsset: 'ALL' | AssetType
   onSelectAsset: (asset: 'ALL' | AssetType) => void
+  loading?: boolean
 }
 
 export function TransactionList({
   transactions,
   selectedAsset,
   onSelectAsset,
+  loading = false,
 }: TransactionListProps) {
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -47,7 +49,7 @@ export function TransactionList({
           </div>
 
           <span className="text-[11px] text-slate-400 font-mono">
-            {filteredTransactions.length} di {transactions.length}
+            {loading ? 'Caricamento…' : `${filteredTransactions.length} di ${transactions.length}`}
           </span>
         </div>
 
@@ -123,7 +125,28 @@ export function TransactionList({
 
       {/* Scrollable List Container */}
       <div className="flex-1 max-h-[460px] overflow-y-auto divide-y divide-slate-800/60 custom-scrollbar">
-        {filteredTransactions.length > 0 ? (
+        {loading ? (
+          <div className="divide-y divide-slate-800/40 animate-pulse">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex items-center justify-between px-3.5 py-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-full bg-slate-800/80" />
+                  <div className="space-y-1.5">
+                    <div className="h-3 w-28 rounded bg-slate-800" />
+                    <div className="h-2.5 w-40 rounded bg-slate-800/60" />
+                  </div>
+                </div>
+                <div className="space-y-1.5 text-right">
+                  <div className="h-3.5 w-20 rounded bg-slate-800 ml-auto" />
+                  <div className="h-2.5 w-12 rounded bg-slate-800/60 ml-auto" />
+                </div>
+              </div>
+            ))}
+            <p className="text-center text-[10px] text-slate-400 py-3 font-mono">
+              Caricamento transazioni dal nodo...
+            </p>
+          </div>
+        ) : filteredTransactions.length > 0 ? (
           filteredTransactions.map((tx) => (
             <TransactionItem key={tx.id} transaction={tx} />
           ))

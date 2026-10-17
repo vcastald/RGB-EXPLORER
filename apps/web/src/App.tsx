@@ -12,9 +12,35 @@ const defaultNonBtcTransactions = (sampleTransactionsData as Transaction[]).filt
 
 export default function App() {
   const [apiStatus, setApiStatus] = useState<string>('Checking…')
-  const [transactions, setTransactions] = useState<Transaction[]>(sampleTransactionsData as Transaction[])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [transactionsLoading, setTransactionsLoading] = useState<boolean>(true)
   const [denomination, setDenomination] = useState<Denomination>('USD')
   const [depositAddress, setDepositAddress] = useState<string | null>(null)
+
+  // Theme state: 'dark' (default) or 'light' (white mode)
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('rgb_theme')
+      if (saved === 'light' || saved === 'dark') return saved
+    }
+    return 'dark'
+  })
+
+  useEffect(() => {
+    const root = document.documentElement
+    if (theme === 'light') {
+      root.classList.add('light')
+      root.classList.remove('dark')
+    } else {
+      root.classList.add('dark')
+      root.classList.remove('light')
+    }
+    localStorage.setItem('rgb_theme', theme)
+  }, [theme])
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+  }, [])
 
   // Live node status hook querying /api/node/status
   const { isOnline, refresh: refreshNode } = useNodeStatus(15000)
@@ -54,6 +80,7 @@ export default function App() {
   // Fetch real on-chain BTC transactions from Kaleido node
   const fetchTransactions = useCallback(async (signal?: AbortSignal) => {
     try {
+      setTransactionsLoading(true)
       const response = await fetch('/api/wallet/transactions', {
         signal,
       })
@@ -102,11 +129,15 @@ export default function App() {
           )
           setTransactions(merged)
         }
+      } else {
+        setTransactions((prev) => (prev.length > 0 ? prev : defaultNonBtcTransactions))
       }
     } catch (error) {
       if (!(error instanceof Error && error.name === 'AbortError')) {
-        // Keep existing transactions in case of temporary network glitches
+        setTransactions((prev) => (prev.length > 0 ? prev : defaultNonBtcTransactions))
       }
+    } finally {
+      setTransactionsLoading(false)
     }
   }, [])
 
@@ -126,6 +157,7 @@ export default function App() {
   }, [isOnline, fetchDepositAddress, fetchTransactions])
 
   const handleRefresh = useCallback(() => {
+    setTransactionsLoading(true)
     refreshNode()
     fetchDepositAddress()
     fetchTransactions()
@@ -152,6 +184,8 @@ export default function App() {
         nodeOnline={isOnline}
         depositAddress={depositAddress}
         onRefreshNode={handleRefresh}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
       
       {/* 2-Column App Canvas: Left: Agent Chat UI, Right: Shifted Dashboard */}
@@ -161,6 +195,7 @@ export default function App() {
         <div className="flex-1 min-w-0 overflow-y-auto">
           <Dashboard
             transactions={transactions}
+            transactionsLoading={transactionsLoading}
             nodeOnline={isOnline}
             depositAddress={depositAddress}
             denomination={denomination}

@@ -9,6 +9,7 @@ import { shortenIdentifier } from '../utils/formatters'
 
 interface DashboardProps {
   transactions: Transaction[]
+  transactionsLoading?: boolean
   nodeOnline: boolean | null
   depositAddress?: string | null
   denomination: Denomination
@@ -17,6 +18,7 @@ interface DashboardProps {
 
 export function Dashboard({
   transactions,
+  transactionsLoading = false,
   nodeOnline,
   depositAddress,
   denomination,
@@ -191,6 +193,7 @@ export function Dashboard({
             transactions={transactions}
             selectedAsset={selectedAsset}
             onSelectAsset={setSelectedAsset}
+            loading={transactionsLoading}
           />
         </div>
 
@@ -201,6 +204,8 @@ export function Dashboard({
             selectedAsset={selectedAsset}
             onSelectAsset={setSelectedAsset}
             denomination={denomination}
+            loading={transactionsLoading}
+            quotes={quotes}
           />
 
           {/* Quotes Area below Pie Chart */}

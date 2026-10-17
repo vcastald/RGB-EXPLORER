@@ -46,7 +46,7 @@ const FALLBACK_QUOTES: MarketQuote[] = [
 ]
 
 export function useFrame(intervalMs: number = 5 * 60 * 1000) {
-  const [quotes, setQuotes] = useState<MarketQuote[]>(FALLBACK_QUOTES)
+  const [quotes, setQuotes] = useState<MarketQuote[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -70,6 +70,7 @@ export function useFrame(intervalMs: number = 5 * 60 * 1000) {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossibile aggiornare le quotazioni')
+      setQuotes((prev) => (prev.length > 0 ? prev : FALLBACK_QUOTES))
     } finally {
       setLoading(false)
     }
