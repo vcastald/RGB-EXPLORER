@@ -1,5 +1,6 @@
-
 export type AssetType = 'USDT' | 'XAUT' | 'BTC'
+
+export type Denomination = 'USD' | 'BTC'
 
 export interface TransactionSender {
   name: string

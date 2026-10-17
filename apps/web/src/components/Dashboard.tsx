@@ -1,17 +1,29 @@
-import { Transaction } from '../types/transaction'
-import { StatsCards } from './StatsCards'
+import { useState } from 'react'
+import { Transaction, AssetType, Denomination } from '../types/transaction'
 import { TransactionList } from './TransactionList'
+import { AssetPieChart } from './AssetPieChart'
 import { LightningIcon } from './Icons'
 
 interface DashboardProps {
   transactions: Transaction[]
   nodeOnline: boolean | null
   nodePubkey?: string
+  denomination: Denomination
+  onDenominationChange: (val: Denomination) => void
 }
 
-export function Dashboard({ transactions, nodeOnline, nodePubkey }: DashboardProps) {
+export function Dashboard({
+  transactions,
+  nodeOnline,
+  nodePubkey,
+  denomination,
+  onDenominationChange,
+}: DashboardProps) {
+  const [selectedAsset, setSelectedAsset] = useState<'ALL' | AssetType>('ALL')
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
       {/* Node Alert if Offline */}
       {nodeOnline === false && (
         <div className="mb-6 flex items-center justify-between rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-300">
@@ -32,8 +44,8 @@ export function Dashboard({ transactions, nodeOnline, nodePubkey }: DashboardPro
         </div>
       )}
 
-      {/* Dashboard Headline */}
-      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      {/* Dashboard Headline & Actions */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2.5">
             <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
@@ -53,23 +65,115 @@ export function Dashboard({ transactions, nodeOnline, nodePubkey }: DashboardPro
           </p>
         </div>
 
-        {nodePubkey && (
-          <div className="hidden lg:flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/40 px-3.5 py-2 text-xs">
-            <span className="text-amber-400"><LightningIcon className="h-4 w-4" /></span>
-            <span className="text-slate-400">Pubkey:</span>
-            <span className="font-mono text-slate-200 truncate max-w-[180px]">{nodePubkey}</span>
+        {/* Right side of Headline: pubKey display + Denomination Dropdown PopUp */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {nodePubkey && (
+            <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/40 px-3.5 py-2 text-xs">
+              <span className="text-amber-400"><LightningIcon className="h-4 w-4" /></span>
+              <span className="text-slate-400">Pubkey:</span>
+              <span className="font-mono text-slate-200 truncate max-w-[150px] sm:max-w-[180px]">{nodePubkey}</span>
+            </div>
+          )}
+
+          {/* Small Currency / Unit Dropdown PopUp */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 px-3 py-2 text-xs font-medium text-slate-200 transition-all cursor-pointer shadow-sm hover:border-slate-700"
+              title="Seleziona la valuta di stima per il controvalore"
+            >
+              <span className="text-slate-400">Valuta:</span>
+              <span className={`font-bold flex items-center gap-1 ${denomination === 'USD' ? 'text-emerald-400' : 'text-orange-400'}`}>
+                {denomination === 'USD' ? '$ USD' : '₿ BTC'}
+              </span>
+              <svg
+                className={`h-3.5 w-3.5 text-slate-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {dropdownOpen && (
+              <>
+                {/* Backdrop to close */}
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setDropdownOpen(false)}
+                />
+
+                {/* PopUp Menu */}
+                <div className="absolute right-0 top-full mt-1.5 z-50 w-44 rounded-xl border border-slate-800 bg-slate-900/95 p-1.5 shadow-2xl backdrop-blur-md animate-fadeIn">
+                  <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Controvalore in
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDenominationChange('USD')
+                      setDropdownOpen(false)
+                    }}
+                    className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${
+                      denomination === 'USD'
+                        ? 'bg-emerald-500/15 text-emerald-300 font-semibold'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-emerald-400 font-bold text-sm">$</span>
+                      <span>Dollari (USD)</span>
+                    </span>
+                    {denomination === 'USD' && <span className="text-emerald-400 text-xs font-bold">✓</span>}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDenominationChange('BTC')
+                      setDropdownOpen(false)
+                    }}
+                    className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${
+                      denomination === 'BTC'
+                        ? 'bg-orange-500/15 text-orange-300 font-semibold'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-orange-400 font-bold text-sm">₿</span>
+                      <span>Bitcoin (BTC)</span>
+                    </span>
+                    {denomination === 'BTC' && <span className="text-orange-400 text-xs font-bold">✓</span>}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* 1. Stat cards: Totale per asset */}
-      <div className="mb-8">
-        <StatsCards transactions={transactions} />
-      </div>
+      {/* Central Section: Scrollable Transaction List on the Left, Pie Chart on the Right */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12 items-start">
+        {/* Left Column: Smaller scrollable transaction list */}
+        <div className="xl:col-span-7">
+          <TransactionList
+            transactions={transactions}
+            selectedAsset={selectedAsset}
+            onSelectAsset={setSelectedAsset}
+          />
+        </div>
 
-      {/* 2. Main Transaction feed: Da chi arriva, quanto e cosa */}
-      <div>
-        <TransactionList transactions={transactions} />
+        {/* Right Column: Pie Chart with Asset Totals */}
+        <div className="xl:col-span-5">
+          <AssetPieChart
+            transactions={transactions}
+            selectedAsset={selectedAsset}
+            onSelectAsset={setSelectedAsset}
+            denomination={denomination}
+          />
+        </div>
       </div>
     </div>
   )

@@ -17,7 +17,6 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  // Accent color by asset
   const getAssetBadge = () => {
     switch (transaction.asset) {
       case 'USDT':
@@ -37,7 +36,7 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
       case 'BTC':
         return {
           label: 'BTC',
-          schema: 'LN Native',
+          schema: 'LN',
           badgeColor: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
           amountColor: 'text-orange-400',
         }
@@ -49,36 +48,38 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
   return (
     <div
       onClick={() => setExpanded(!expanded)}
-      className="group cursor-pointer border-b border-slate-800/80 bg-slate-900/40 px-4 py-4 transition-all duration-150 hover:bg-slate-800/50 sm:px-6"
+      className="group cursor-pointer border-b border-slate-800/70 bg-slate-900/30 px-3.5 py-3 transition-all duration-150 hover:bg-slate-800/50"
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {/* Left: Da chi arriva & Asset */}
-        <div className="flex items-center gap-3.5">
+      <div className="flex items-center justify-between gap-3">
+        {/* Left: Icon & Sender */}
+        <div className="flex min-w-0 items-center gap-2.5">
           {/* Asset Icon */}
           <div className="relative flex-shrink-0">
-            <AssetBadgeIcon asset={transaction.asset} className="h-10 w-10 text-base" />
+            <AssetBadgeIcon asset={transaction.asset} className="h-8 w-8 text-xs" />
             <span
-              className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-900 text-amber-400 ring-2 ring-slate-900"
+              className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-950 text-amber-400 ring-1 ring-slate-900"
               title="Lightning Network"
             >
-              <LightningIcon className="h-2.5 w-2.5" />
+              <LightningIcon className="h-2 w-2" />
             </span>
           </div>
 
           {/* Sender details */}
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-semibold text-slate-100 group-hover:text-white">
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-xs font-semibold text-slate-100 group-hover:text-white">
                 {transaction.sender.name}
               </span>
-              <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${assetStyle.badgeColor}`}>
+              <span
+                className={`inline-flex items-center rounded px-1 py-0.2 text-[9px] font-semibold border ${assetStyle.badgeColor}`}
+              >
                 {assetStyle.schema}
               </span>
             </div>
-            
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <span className="font-mono text-slate-300">
-                da: {shortenIdentifier(transaction.sender.identifier, 14, 6)}
+
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 truncate">
+              <span className="font-mono text-slate-400">
+                da: {shortenIdentifier(transaction.sender.identifier, 8, 4)}
               </span>
               {transaction.memo && (
                 <>
@@ -90,73 +91,59 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
           </div>
         </div>
 
-        {/* Right: Quanto e cosa arriva & Data */}
-        <div className="flex items-center justify-between sm:flex-col sm:items-end">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-emerald-400">+</span>
-            <span className={`text-base font-bold tracking-tight sm:text-lg ${assetStyle.amountColor}`}>
-              {formatAmount(transaction.amount, transaction.asset)}
-            </span>
+        {/* Right: Amount & Status */}
+        <div className="flex flex-shrink-0 flex-col items-end">
+          <div className={`text-xs font-bold tracking-tight sm:text-sm ${assetStyle.amountColor}`}>
+            + {formatAmount(transaction.amount, transaction.asset)}
           </div>
-
-          <div className="flex items-center gap-1.5 text-xs text-slate-400">
-            <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
-              <CheckCircleIcon className="h-3 w-3" />
-              Incassato
+          <div className="flex items-center gap-1 text-[10px] text-slate-400">
+            <span className="inline-flex items-center gap-0.5 text-emerald-400 font-medium">
+              <CheckCircleIcon className="h-2.5 w-2.5" />
             </span>
-            <span className="text-slate-600">•</span>
             <span>{formatTimeAgo(transaction.timestamp)}</span>
           </div>
         </div>
       </div>
 
-      {/* Expanded Details: Technical specs when clicked */}
+      {/* Expanded Details */}
       {expanded && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="mt-3.5 rounded-xl border border-slate-800 bg-slate-950/70 p-3.5 text-xs text-slate-300 animate-fadeIn"
+          className="mt-2.5 rounded-lg border border-slate-800 bg-slate-950/80 p-3 text-[11px] text-slate-300 animate-fadeIn"
         >
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <div className="space-y-1.5">
             <div>
-              <span className="text-slate-400">Identificativo Mittente:</span>
-              <p className="mt-0.5 font-mono text-slate-200 break-all select-all">
+              <span className="text-slate-400">Mittente completo: </span>
+              <span className="font-mono text-slate-200 select-all break-all">
                 {transaction.sender.identifier}
-              </p>
+              </span>
             </div>
             {transaction.channelId && (
               <div>
-                <span className="text-slate-400">Canale Lightning:</span>
-                <p className="mt-0.5 font-mono text-slate-200">{transaction.channelId}</p>
+                <span className="text-slate-400">Canale: </span>
+                <span className="font-mono text-slate-200">{transaction.channelId}</span>
               </div>
             )}
             {transaction.paymentHash && (
-              <div className="sm:col-span-2">
+              <div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Payment Hash (Preimage Proof):</span>
+                  <span className="text-slate-400">Payment Hash:</span>
                   <button
                     onClick={() => handleCopy(transaction.paymentHash!)}
-                    className="text-[11px] text-amber-400 hover:underline cursor-pointer"
+                    className="text-[10px] text-amber-400 hover:underline cursor-pointer"
                   >
-                    {copied ? 'Copiato!' : 'Copia Hash'}
+                    {copied ? 'Copiato!' : 'Copia'}
                   </button>
                 </div>
-                <p className="mt-0.5 font-mono text-slate-300 break-all select-all">
+                <p className="font-mono text-slate-300 break-all select-all text-[10px]">
                   {transaction.paymentHash}
                 </p>
               </div>
             )}
-            <div className="text-slate-400">
-              Data e ora completa:{' '}
-              <span className="font-mono text-slate-300">
-                {new Date(transaction.timestamp).toLocaleString('it-IT')}
-              </span>
+            <div className="flex justify-between text-slate-400 pt-1 border-t border-slate-800/80">
+              <span>{new Date(transaction.timestamp).toLocaleString('it-IT')}</span>
+              {transaction.memo && <span className="italic text-slate-300">{transaction.memo}</span>}
             </div>
-            {transaction.memo && (
-              <div className="text-slate-400">
-                Causale:{' '}
-                <span className="font-medium text-slate-200">{transaction.memo}</span>
-              </div>
-            )}
           </div>
         </div>
       )}

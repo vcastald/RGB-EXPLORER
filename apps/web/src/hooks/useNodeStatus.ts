@@ -17,7 +17,7 @@ export function useNodeStatus(pollIntervalMs = 15000) {
     setStatus((prev) => ({ ...prev, loading: true }))
 
     try {
-      // 1. Primary call: backend endpoint /api/node/status (proxied by Vite to Fastify)
+      // 1. Primary call: backend endpoint via Vite proxy (/api/node/status -> Fastify API)
       const response = await fetch('/api/node/status', {
         signal: AbortSignal.timeout(3000),
       })
@@ -35,9 +35,11 @@ export function useNodeStatus(pollIntervalMs = 15000) {
         }
       }
     } catch {
-      // Backend may be offline or unreachable; try direct fallback to local node port 3901 if available
+      // 2. Direct fallback using environment variables from root .env
+      const nodeHost = import.meta.env.RGB_NODE_HOST || '127.0.0.1'
+      const nodePort = import.meta.env.RGB_NODE_PORT || '3901'
       try {
-        const fallback = await fetch('http://127.0.0.1:3901/nodeinfo', {
+        const fallback = await fetch(`http://${nodeHost}:${nodePort}/nodeinfo`, {
           signal: AbortSignal.timeout(2000),
         })
         if (fallback.ok) {

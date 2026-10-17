@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Header } from './components/Header'
 import { Dashboard } from './components/Dashboard'
+import { AgentChat } from './components/AgentChat'
 import sampleTransactionsData from './data/transactions.json'
-import { Transaction } from './types/transaction'
+import { Transaction, Denomination } from './types/transaction'
 import { useNodeStatus } from './hooks/useNodeStatus'
 
 export default function App() {
   const [apiStatus, setApiStatus] = useState<string>('Checking…')
   const [transactions] = useState<Transaction[]>(sampleTransactionsData as Transaction[])
+  const [denomination, setDenomination] = useState<Denomination>('USD')
 
   // Live node status hook querying /api/node/status
   const { isOnline, pubkey, refresh: refreshNode } = useNodeStatus(15000)
@@ -35,16 +37,23 @@ export default function App() {
         onRefreshNode={refreshNode}
       />
       
-      <main className="flex-1">
-        <Dashboard
-          transactions={transactions}
-          nodeOnline={isOnline}
-          nodePubkey={pubkey}
-        />
+      {/* 2-Column App Canvas: Left: Agent Chat UI, Right: Shifted Dashboard */}
+      <main className="flex-1 flex flex-col lg:flex-row min-w-0">
+        <AgentChat />
+        
+        <div className="flex-1 min-w-0 overflow-y-auto">
+          <Dashboard
+            transactions={transactions}
+            nodeOnline={isOnline}
+            nodePubkey={pubkey}
+            denomination={denomination}
+            onDenominationChange={setDenomination}
+          />
+        </div>
       </main>
 
-      <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-400">
-        <div className="mx-auto max-w-5xl px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <footer className="border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-400">
+        <div className="mx-auto max-w-7xl px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>RGB Explorer • Hackathon Project</span>
           <span className="font-mono text-slate-400">Lightning Network + RGB Protocol</span>
         </div>
