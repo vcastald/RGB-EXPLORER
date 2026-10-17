@@ -4,13 +4,24 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, fileURLToPath(new URL('../../', import.meta.url)), '')
+  const envDir = fileURLToPath(new URL('../../', import.meta.url))
+  const env = loadEnv(mode, envDir, '')
+  const apiPort = env.API_PORT || '3101'
+  const webPort = Number(env.WEB_PORT || 5173)
+
   return {
+    envDir,
+    envPrefix: ['VITE_', 'API_', 'WEB_', 'RGB_'],
     plugins: [react(), tailwindcss()],
     server: {
       host: '127.0.0.1',
-      port: Number(env.WEB_PORT ?? 5173),
-      proxy: { '/api': `http://127.0.0.1:${env.API_PORT ?? 3101}` },
+      port: webPort,
+      proxy: {
+        '/api': {
+          target: `http://127.0.0.1:${apiPort}`,
+          changeOrigin: true,
+        },
+      },
     },
   }
 })

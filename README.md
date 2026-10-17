@@ -63,3 +63,23 @@ Fastify exposes `GET /api/node/status` (HTTP 200 with `{ "online": true, "pubkey
 By default the node API is at `http://127.0.0.1:3901` (Lightning peer port `10091`). Change `RGB_NODE_PORT` and `RGB_PEER_PORT` in `.env` before creating a node if those ports are taken; Docker Compose, setup and Fastify read these values. `RGB_NODE_URL` optionally overrides Fastify's node target only. Do not change node ports after creating a wallet without first stopping the container and checking your setup. It runs on KaleidoSwap's Mutinynet (`SignetCustom`) with transaction sync via `https://esplora.signet.kaleidoswap.com`. It is **not yet connected to the Fastify UI** and has no funds or channels. Keep `.env` local; `.env.example` contains only safe defaults.
 
 **Back up immediately:** `.local-node/mnemonic` contains the secret recovery phrase; `.local-node/password` is the wallet password. Save these securely and never share or commit them. The mnemonic alone **cannot restore RGB/Lightning channel state**: preserve/back up the entire `.local-node/data` directory too, with the node stopped. `.local-node/` is gitignored. The node's unauthenticated API is bound to localhost only; do not expose it to the internet. This is a test-network setup, not a production wallet. Do not delete `.local-node/` to fix a setup error; inspect it first.
+
+## Read-only wallet overview API
+
+`GET /api/wallet/overview` returns `{ observedAt, network, height, pubkey, btc, assets, channels }`. `btc.vanilla` and `btc.colored` are satoshi balances (`settled`, `future`, `spendable`); `btc.cached: true` means the request does **not** trigger a wallet sync. `assets` contains `{ schema, assetId, ticker, name, precision, balance }` and `channels` contains `{ channelId, peerPubkey, status, usable, capacitySat, localBalanceSat, assetId }`. When the node is unavailable or locked, it returns HTTP 503 `{ "error": "Node unavailable" }` (no partial snapshot). The endpoint does not include payment history yet.
+
+```bash
+curl http://127.0.0.1:3101/api/wallet/overview
+```
+
+Fastify decorates the app with a KaleidoSwap service from `apps/api/src/services/kaleido.ts`; the route lives in `apps/api/src/routes/wallet.ts`. Offline tests inject a fake service or SDK node; the curl command exercises the live node. No frontend changes are needed.
+
+## Generate a BTC deposit address
+
+With the Mutinynet node running and unlocked, request an address from the backend:
+
+```bash
+curl -X POST http://127.0.0.1:3101/api/wallet/deposit-addresses
+```
+
+Returns HTTP 201 `{ "address": "...", "network": "SignetCustom", "nodePubkey": "...", "createdAt": "..." }`. **Each POST requests a fresh address** from the same wallet; use it for the first deposit or for subsequent deposits. It does not contact a faucet, fund the wallet, or create a Lightning channel. Addresses are recorded in a local SQLite database (`APP_DB_PATH` in `.env`, default `.local-app/addresses.sqlite`). List recorded addresses for the current wallet with `curl http://127.0.0.1:3101/api/wallet/deposit-addresses`. This database is an app-side record, **not a wallet backup**: node-generated addresses may exist even if saving fails or the process crashes. HTTP 503 means the node is unavailable or not on Mutinynet; HTTP 500 on storage failure means do not blindly retry the request. Only send **Mutinynet test BTC** to these addresses; back up the wallet's node data before funding it. This local dev endpoint has no user authentication—do not expose Fastify publicly.

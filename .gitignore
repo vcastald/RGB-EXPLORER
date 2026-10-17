@@ -122,3 +122,4 @@ Thumbs.db
 Desktop.ini
 # Local Mutinynet wallet, secrets and Lightning channel state
 .local-node/
+.local-app/
