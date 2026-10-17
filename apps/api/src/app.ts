@@ -1,11 +1,26 @@
 import Fastify from 'fastify'
+import { createKaleidoService } from './services/kaleido.js'
+import { registerWalletRoutes } from './routes/wallet.js'
+import type { OverviewService } from './services/kaleido.js'
 
-export function createApp(options: { nodeUrl?: string; fetchNode?: typeof fetch } = {}) {
+declare module 'fastify' {
+  interface FastifyInstance {
+    kaleidoService: OverviewService
+  }
+}
+
+export function createApp(options: { nodeUrl?: string; fetchNode?: typeof fetch; kaleidoService?: OverviewService } = {}) {
   const app = Fastify({ logger: true })
   const nodeUrl = options.nodeUrl ?? process.env.RGB_NODE_URL ?? `http://${process.env.RGB_NODE_HOST ?? '127.0.0.1'}:${process.env.RGB_NODE_PORT ?? '3901'}`
   const fetchNode = options.fetchNode ?? fetch
+  const liveService = options.kaleidoService ? undefined : createKaleidoService(nodeUrl)
+
+  app.decorate('kaleidoService', options.kaleidoService ?? liveService!)
+  if (liveService) app.addHook('onClose', async () => { await liveService.close() })
 
   app.get('/api/health', async () => ({ status: 'ok' }))
+
+  registerWalletRoutes(app)
 
   app.get('/api/node/status', async (_request, reply) => {
     try {

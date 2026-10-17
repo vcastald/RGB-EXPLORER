@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createApp } from './app.js'
+import type { OverviewService } from './services/kaleido.js'
+import { BitcoinNetwork } from 'kaleido-sdk/rln'
 
 test('node status reports a responding node', async () => {
   const app = createApp({
@@ -35,4 +37,25 @@ test('health endpoint responds', async () => {
   } finally {
     await app.close()
   }
+})
+
+test('wallet overview returns service response', async () => {
+  const overview = { observedAt: '2026-10-17T12:00:00.000Z', network: BitcoinNetwork.SignetCustom, height: 1,
+    pubkey: 'key', btc: { vanilla: { settled: 0, future: 0, spendable: 0 }, colored: { settled: 0, future: 0, spendable: 0 }, cached: true },
+    assets: [], channels: [] } satisfies Awaited<ReturnType<OverviewService['getOverview']>>
+  const app = createApp({ kaleidoService: { getOverview: async () => overview } })
+  try {
+    const response = await app.inject('/api/wallet/overview')
+    assert.equal(response.statusCode, 200)
+    assert.deepEqual(response.json(), overview)
+  } finally { await app.close() }
+})
+
+test('wallet overview returns 503 when node fails', async () => {
+  const app = createApp({ kaleidoService: { getOverview: async () => { throw new Error('connection refused') } } })
+  try {
+    const response = await app.inject('/api/wallet/overview')
+    assert.equal(response.statusCode, 503)
+    assert.deepEqual(response.json(), { error: 'Node unavailable' })
+  } finally { await app.close() }
 })
