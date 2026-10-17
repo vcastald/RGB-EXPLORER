@@ -32,4 +32,23 @@ export function registerWalletRoutes(app: FastifyInstance) {
       return reply.code(503).send({ error: 'Node unavailable' })
     }
   })
+
+  app.get('/api/wallet/transactions', async (_request, reply) => {
+    try {
+      return await app.kaleidoService.listTransactions()
+    } catch (error) {
+      app.log.warn({ error }, 'Wallet transactions unavailable')
+      return reply.code(503).send({ error: 'Node unavailable' })
+    }
+  })
+
+  // Alias /api/transactions
+  app.get('/api/transactions', async (_request, reply) => {
+    try {
+      return await app.kaleidoService.listTransactions()
+    } catch (error) {
+      app.log.warn({ error }, 'Transactions unavailable')
+      return reply.code(503).send({ error: 'Node unavailable' })
+    }
+  })
 }

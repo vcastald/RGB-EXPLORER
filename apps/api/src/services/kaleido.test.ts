@@ -17,13 +17,14 @@ test('overview requests a fresh BTC balance', async () => {
     },
     listAssets: async () => ({ nia: [], uda: [], cfa: [], ifa: [] }),
     listChannels: async () => ({ channels: [] }),
+    listTransactions: async () => ({ transactions: [] }),
   } satisfies NodeReader
   const result = await new KaleidoService(node, new SqliteAddressStore(':memory:'), () => new Date('2026-10-17T12:00:00Z')).getOverview()
-  assert.equal(skipSync, false)
+  assert.equal(skipSync, true)
   assert.deepEqual(result, {
     observedAt: '2026-10-17T12:00:00.000Z', network: 'SignetCustom', height: 42,
     pubkey: 'test-key',
-    btc: { vanilla: { settled: 0, future: 0, spendable: 0 }, colored: { settled: 0, future: 0, spendable: 0 }, cached: false },
+    btc: { vanilla: { settled: 0, future: 0, spendable: 0 }, colored: { settled: 0, future: 0, spendable: 0 }, cached: true },
     assets: [], channels: [],
   })
 })
@@ -33,7 +34,8 @@ test('address generation checks network before requesting a new address', async 
   const node = {
     getNetworkInfo: async () => ({ network: BitcoinNetwork.Regtest, height: 1 }),
     getAddress: async () => { calls++; return { address: 'bcrt1-test' } },
-  } as NodeReader
+    listTransactions: async () => ({ transactions: [] }),
+  } as unknown as NodeReader
   await assert.rejects(() => new KaleidoService(node, new SqliteAddressStore(':memory:')).createDepositAddress(), /Mutinynet/)
   assert.equal(calls, 0)
 })
@@ -44,7 +46,8 @@ test('address generation returns node-derived address', async () => {
     getNetworkInfo: async () => ({ network: BitcoinNetwork.SignetCustom, height: 1 }),
     getAddress: async () => ({ address: `tb1-test-${++calls}` }),
     getNodeInfo: async () => ({ pubkey: 'key' }),
-  } as NodeReader
+    listTransactions: async () => ({ transactions: [] }),
+  } as unknown as NodeReader
   const service = new KaleidoService(node, new SqliteAddressStore(':memory:'), () => new Date('2026-10-17T12:00:00Z'))
   const expected = (address: string) => ({ address, network: 'SignetCustom', nodePubkey: 'key', createdAt: '2026-10-17T12:00:00.000Z' })
   assert.deepEqual(await service.createDepositAddress(), expected('tb1-test-1'))
@@ -72,4 +75,30 @@ test('quotes maps market pairs to structured quotes', async () => {
   assert.equal(res.quotes[2].pair, 'USDT/XAUT')
   assert.equal(res.quotes[2].price, 0.00025)
   assert.equal(res.quotes[2].inversePrice, 4000)
+})
+
+test('listTransactions maps on-chain transactions to normalized BTC records', async () => {
+  const node = {
+    listTransactions: async () => ({
+      transactions: [
+        {
+          transaction_type: 'User' as any,
+          txid: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+          received: 5000000,
+          sent: 0,
+          fee: 150,
+          confirmation_time: { height: 123456, timestamp: 1770000000 },
+        },
+      ],
+    }),
+  } as unknown as NodeReader
+  const service = new KaleidoService(node, new SqliteAddressStore(':memory:'), () => new Date('2026-10-17T12:00:00Z'))
+  const res = await service.listTransactions()
+  assert.equal(res.transactions.length, 1)
+  const tx = res.transactions[0]
+  assert.equal(tx.txid, '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')
+  assert.equal(tx.amount, 0.05)
+  assert.equal(tx.asset, 'BTC')
+  assert.equal(tx.direction, 'incoming')
+  assert.equal(tx.status, 'settled')
 })

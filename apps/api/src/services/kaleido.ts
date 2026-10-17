@@ -12,6 +12,7 @@ export interface NodeReader {
   getBtcBalance(skipSync?: boolean): ReturnType<Rln['getBtcBalance']>
   listAssets(): ReturnType<Rln['listAssets']>
   listChannels(): ReturnType<Rln['listChannels']>
+  listTransactions(): ReturnType<Rln['listTransactions']>
 }
 
 export interface MarketReader {
@@ -32,6 +33,28 @@ export interface MarketQuote {
 export interface QuotesResponse {
   observedAt: string
   quotes: MarketQuote[]
+}
+
+export interface NodeBtcTransaction {
+  id: string
+  txid: string
+  timestamp: string
+  asset: 'BTC'
+  amount: number
+  unit: string
+  receivedSats: number
+  sentSats: number
+  feeSats: number
+  direction: 'incoming' | 'outgoing'
+  status: 'settled' | 'pending'
+  blockHeight: number | null
+  transactionType: string
+  sender: {
+    name: string
+    identifier: string
+    type: 'node'
+  }
+  memo: string
 }
 
 export class KaleidoService {
@@ -69,11 +92,11 @@ export class KaleidoService {
   }
 
   async getOverview() {
-    // Sync BTC wallet so newly confirmed deposits appear in the overview.
+    // Cached balance avoids triggering a wallet sync during an overview request.
     const [info, network, btc, assets, channels] = await Promise.all([
       this.node.getNodeInfo(),
       this.node.getNetworkInfo(),
-      this.node.getBtcBalance(false),
+      this.node.getBtcBalance(true),
       this.node.listAssets(),
       this.node.listChannels(),
     ])
@@ -83,7 +106,7 @@ export class KaleidoService {
       network: network.network,
       height: network.height,
       pubkey: info.pubkey,
-      btc: { ...btc, cached: false },
+      btc: { ...btc, cached: true },
       assets: Object.entries(assets).flatMap(([schema, entries]) =>
         (entries ?? []).map((asset) =>
           ({ schema, assetId: asset.asset_id, ticker: 'ticker' in asset ? asset.ticker : null,
@@ -97,6 +120,45 @@ export class KaleidoService {
         localBalanceSat: channel.local_balance_sat,
         assetId: channel.asset_id ?? null,
       })),
+    }
+  }
+
+  async listTransactions(): Promise<{ observedAt: string; transactions: NodeBtcTransaction[] }> {
+    const res = await this.node.listTransactions()
+    const transactions: NodeBtcTransaction[] = (res.transactions ?? []).map((tx) => {
+      const netSats = tx.received - tx.sent
+      const isIncoming = netSats >= 0
+      const amount = Math.abs(netSats) / 100_000_000
+      const timestamp = tx.confirmation_time
+        ? new Date(tx.confirmation_time.timestamp * 1000).toISOString()
+        : this.now().toISOString()
+
+      return {
+        id: tx.txid,
+        txid: tx.txid,
+        timestamp,
+        asset: 'BTC' as const,
+        amount,
+        unit: 'BTC',
+        receivedSats: tx.received,
+        sentSats: tx.sent,
+        feeSats: tx.fee,
+        direction: isIncoming ? 'incoming' : 'outgoing',
+        status: tx.confirmation_time ? 'settled' : 'pending',
+        blockHeight: tx.confirmation_time?.height ?? null,
+        transactionType: tx.transaction_type,
+        sender: {
+          name: isIncoming ? 'Bitcoin On-Chain Deposit' : 'Bitcoin On-Chain Transfer',
+          identifier: tx.txid,
+          type: 'node' as const,
+        },
+        memo: `On-chain ${tx.transaction_type}`,
+      }
+    })
+
+    return {
+      observedAt: this.now().toISOString(),
+      transactions,
     }
   }
 
@@ -163,7 +225,7 @@ export class KaleidoService {
 
 export type WalletService = Pick<
   KaleidoService,
-  'getOverview' | 'createDepositAddress' | 'listDepositAddresses' | 'getQuotes'
+  'getOverview' | 'createDepositAddress' | 'listDepositAddresses' | 'getQuotes' | 'listTransactions'
 >
 
 export type OverviewService = WalletService
@@ -181,6 +243,7 @@ export function createKaleidoService(
     createDepositAddress: () => service.createDepositAddress(),
     listDepositAddresses: () => service.listDepositAddresses(),
     getQuotes: () => service.getQuotes(),
+    listTransactions: () => service.listTransactions(),
     close: async () => {
       await client.close()
       addresses.close()

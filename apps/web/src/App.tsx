@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Header } from './components/Header'
 import { Dashboard } from './components/Dashboard'
 import { AgentChat } from './components/AgentChat'
@@ -6,9 +6,13 @@ import sampleTransactionsData from './data/transactions.json'
 import { Transaction, Denomination } from './types/transaction'
 import { useNodeStatus } from './hooks/useNodeStatus'
 
+const defaultNonBtcTransactions = (sampleTransactionsData as Transaction[]).filter(
+  (tx) => tx.asset !== 'BTC'
+)
+
 export default function App() {
   const [apiStatus, setApiStatus] = useState<string>('Checking…')
-  const [transactions] = useState<Transaction[]>(sampleTransactionsData as Transaction[])
+  const [transactions, setTransactions] = useState<Transaction[]>(sampleTransactionsData as Transaction[])
   const [denomination, setDenomination] = useState<Denomination>('USD')
   const [depositAddress, setDepositAddress] = useState<string | null>(null)
 
@@ -16,43 +20,116 @@ export default function App() {
   const { isOnline, refresh: refreshNode } = useNodeStatus(15000)
 
   // Fetch deposit address from backend
-  useEffect(() => {
-    const controller = new AbortController()
-
-    async function fetchDepositAddress() {
-      try {
-        const response = await fetch('/api/wallet/deposit-addresses', {
-          signal: controller.signal,
-        })
-        if (response.ok) {
-          const data = (await response.json()) as { addresses?: Array<{ address: string }> }
-          if (data.addresses && data.addresses.length > 0) {
-            setDepositAddress(data.addresses[0].address)
-            return
-          }
-          // If no address has been created yet, request a new deposit address
-          const createResponse = await fetch('/api/wallet/deposit-addresses', {
-            method: 'POST',
-            signal: controller.signal,
-          })
-          if (createResponse.ok) {
-            const createData = (await createResponse.json()) as { address?: string }
-            if (createData.address) {
-              setDepositAddress(createData.address)
-            }
-          }
+  const fetchDepositAddress = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const response = await fetch('/api/wallet/deposit-addresses', {
+        signal,
+      })
+      if (response.ok) {
+        const data = (await response.json()) as { addresses?: Array<{ address: string }> }
+        if (data.addresses && data.addresses.length > 0) {
+          setDepositAddress(data.addresses[0].address)
+          return
         }
-      } catch (error) {
-        if (!(error instanceof Error && error.name === 'AbortError')) {
-          // Mock fallback address when backend or node is offline
-          setDepositAddress('tb1pjpua0jlrm4y9t6acdndggu6l0350qnajhp3gwx85us0q9fqkha7q0wa6l3')
+        // If no address has been created yet, request a new deposit address
+        const createResponse = await fetch('/api/wallet/deposit-addresses', {
+          method: 'POST',
+          signal,
+        })
+        if (createResponse.ok) {
+          const createData = (await createResponse.json()) as { address?: string }
+          if (createData.address) {
+            setDepositAddress(createData.address)
+          }
         }
       }
+    } catch (error) {
+      if (!(error instanceof Error && error.name === 'AbortError')) {
+        // Mock fallback address when backend or node is offline
+        setDepositAddress('tb1pjpua0jlrm4y9t6acdndggu6l0350qnajhp3gwx85us0q9fqkha7q0wa6l3')
+      }
     }
+  }, [])
 
+  // Fetch real on-chain BTC transactions from Kaleido node
+  const fetchTransactions = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const response = await fetch('/api/wallet/transactions', {
+        signal,
+      })
+      if (response.ok) {
+        const data = (await response.json()) as {
+          transactions?: Array<{
+            id: string
+            txid: string
+            timestamp: string
+            asset: 'BTC'
+            amount: number
+            unit: string
+            direction?: 'incoming' | 'outgoing'
+            status: 'settled' | 'pending'
+            blockHeight?: number | null
+            sender?: {
+              name: string
+              identifier: string
+              type?: 'node' | 'business' | 'individual' | 'exchange'
+            }
+            memo?: string
+          }>
+        }
+
+        if (data && Array.isArray(data.transactions)) {
+          const realBtcTransactions: Transaction[] = data.transactions.map((tx) => ({
+            id: tx.id || tx.txid,
+            txid: tx.txid,
+            timestamp: tx.timestamp,
+            asset: 'BTC' as const,
+            amount: tx.amount,
+            unit: tx.unit || 'BTC',
+            direction: tx.direction,
+            status: tx.status,
+            blockHeight: tx.blockHeight,
+            sender: tx.sender || {
+              name: tx.direction === 'outgoing' ? 'Bitcoin On-Chain Transfer' : 'Bitcoin On-Chain Deposit',
+              identifier: tx.txid,
+              type: 'node',
+            },
+            memo: tx.memo || 'On-chain Bitcoin transaction',
+          }))
+
+          const merged = [...realBtcTransactions, ...defaultNonBtcTransactions].sort(
+            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          )
+          setTransactions(merged)
+        }
+      }
+    } catch (error) {
+      if (!(error instanceof Error && error.name === 'AbortError')) {
+        // Keep existing transactions in case of temporary network glitches
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchDepositAddress(controller.signal)
+    fetchTransactions(controller.signal)
+
+    const interval = setInterval(() => {
+      fetchTransactions()
+    }, 20000)
+
+    return () => {
+      controller.abort()
+      clearInterval(interval)
+    }
+  }, [isOnline, fetchDepositAddress, fetchTransactions])
+
+  const handleRefresh = useCallback(() => {
+    refreshNode()
     fetchDepositAddress()
-    return () => controller.abort()
-  }, [isOnline])
+    fetchTransactions()
+  }, [refreshNode, fetchDepositAddress, fetchTransactions])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -74,7 +151,7 @@ export default function App() {
         apiStatus={apiStatus}
         nodeOnline={isOnline}
         depositAddress={depositAddress}
-        onRefreshNode={refreshNode}
+        onRefreshNode={handleRefresh}
       />
       
       {/* 2-Column App Canvas: Left: Agent Chat UI, Right: Shifted Dashboard */}

@@ -36,7 +36,7 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
       case 'BTC':
         return {
           label: 'BTC',
-          schema: 'LN',
+          schema: transaction.channelId ? 'LN' : 'ON-CHAIN',
           badgeColor: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
           amountColor: 'text-orange-400',
         }
@@ -58,7 +58,7 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
             <AssetBadgeIcon asset={transaction.asset} className="h-8 w-8 text-xs" />
             <span
               className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-950 text-amber-400 ring-1 ring-slate-900"
-              title="Lightning Network"
+              title={transaction.channelId ? 'Lightning Network' : (transaction.asset === 'BTC' ? 'Bitcoin On-Chain' : 'RGB Protocol')}
             >
               <LightningIcon className="h-2 w-2" />
             </span>
@@ -94,10 +94,14 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
         {/* Right: Amount & Status */}
         <div className="flex flex-shrink-0 flex-col items-end">
           <div className={`text-xs font-bold tracking-tight sm:text-sm ${assetStyle.amountColor}`}>
-            + {formatAmount(transaction.amount, transaction.asset)}
+            {transaction.direction === 'outgoing' ? '- ' : '+ '}{formatAmount(transaction.amount, transaction.asset)}
           </div>
           <div className="flex items-center gap-1 text-[10px] text-slate-400">
-            <span className="inline-flex items-center gap-0.5 text-emerald-400 font-medium">
+            <span
+              className={`inline-flex items-center gap-0.5 font-medium ${
+                transaction.status === 'settled' ? 'text-emerald-400' : 'text-amber-400'
+              }`}
+            >
               <CheckCircleIcon className="h-2.5 w-2.5" />
             </span>
             <span>{formatTimeAgo(transaction.timestamp)}</span>
@@ -113,11 +117,33 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
         >
           <div className="space-y-1.5">
             <div>
-              <span className="text-slate-400">Mittente completo: </span>
+              <span className="text-slate-400">Mittente / ID: </span>
               <span className="font-mono text-slate-200 select-all break-all">
                 {transaction.sender.identifier}
               </span>
             </div>
+            {transaction.txid && (
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">TXID On-Chain:</span>
+                  <button
+                    onClick={() => handleCopy(transaction.txid!)}
+                    className="text-[10px] text-amber-400 hover:underline cursor-pointer"
+                  >
+                    {copied ? 'Copiato!' : 'Copia'}
+                  </button>
+                </div>
+                <p className="font-mono text-slate-300 break-all select-all text-[10px]">
+                  {transaction.txid}
+                </p>
+              </div>
+            )}
+            {transaction.blockHeight && (
+              <div>
+                <span className="text-slate-400">Altezza Blocco: </span>
+                <span className="font-mono text-slate-200">#{transaction.blockHeight}</span>
+              </div>
+            )}
             {transaction.channelId && (
               <div>
                 <span className="text-slate-400">Canale: </span>

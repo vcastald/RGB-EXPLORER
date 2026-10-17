@@ -17,6 +17,10 @@ export interface Transaction {
   sender: TransactionSender
   channelId?: string
   paymentHash?: string
+  txid?: string
+  direction?: 'incoming' | 'outgoing'
+  blockHeight?: number | null
   status: 'settled' | 'pending'
   memo?: string
 }
+
