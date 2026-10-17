@@ -127,3 +127,47 @@ curl -sS http://127.0.0.1:3101/api/lightning/usdt/invoices -H 'Content-Type: app
 ```
 
 The invoice requests the specified test-USDT **plus 3,000 sats of BTC carrier**, not a fee-only BTC amount. It expires after 300 seconds. Creation requires an opened, ready, usable channel with enough USDT and BTC inbound capacity on the same channel; capacity is not reserved and settlement is not guaranteed. Returns 201 with `invoice`, `assetId`, `assetAmount` (integer units), `assetPrecision`, `amountUsdt`, `carrierSat`, and `expirySec`; invalid amounts return 400, unavailable capacity/network 409, and node failures 503. No LSP order or payment is created. This local unauthenticated API is not intended for public exposure.
+
+### Create an on-chain test-USDT invoice
+
+For the faucet's **RGB on-chain** form (not Lightning):
+
+```sh
+curl -sS http://127.0.0.1:3101/api/rgb/usdt/invoices -H 'Content-Type: application/json' -d '{}'
+```
+
+Copy the returned `invoice` (`rgb:…`). This requests the known Mutinynet USDT asset without fixing an amount, suitable for a fixed-size faucet claim. Optionally pass `{"amountUsdt":"0.1"}` for an exact amount (six decimal places, 0.000001–1000). Witness receiving, one confirmation, and a one-hour expiry are used. No Lightning channel or 3,000-sat Lightning carrier is required. The sender funds the on-chain transfer.
+
+The response includes `recipientId` and `batchTransferIdx` for subsequent transfer checks; invoice creation is **not** proof of payment. Receipt requires RGB transfer refresh and on-chain settlement. The wallet must already know this USDT contract; unknown assets return 409 rather than silently creating an any-asset invoice. Configure `RGB_PROXY_ENDPOINT` for consignment transport. Node failures return 503; inspect transfers before retrying an uncertain creation. No sending or spending endpoint is exposed.
+
+### Create an on-chain test-XAUT invoice
+
+`POST /api/rgb/xaut/invoices` uses the Mutinynet XAUT contract `rgb:qrilKFY5-VBmdIOF-cH5ziA8-9K9MIFS-OwsjmXe-yOv3Oa8` with **9 decimal places**, witness receiving, one confirmation and a one-hour expiry.
+
+Once XAUT is known to the wallet, request an exact amount (0.000000001–1000):
+
+```sh
+curl -sS http://127.0.0.1:3101/api/rgb/xaut/invoices -H 'Content-Type: application/json' -d '{"amountXaut":"0.01"}'
+```
+
+For a first faucet receipt when XAUT is unknown, explicitly allow an **any-asset** invoice:
+
+```sh
+curl -sS http://127.0.0.1:3101/api/rgb/xaut/invoices -H 'Content-Type: application/json' -d '{"allowAnyAsset":true}'
+```
+
+Select **XAUT** in the faucet's **RGB on-chain** form. Bootstrap invoices must omit the amount; the faucet determines its claim amount. The response reports `anyAsset: true`, `assetId: null`, and `expectedAssetId` plus a warning: **the invoice itself does not restrict the asset**. Verify the received contract after refresh before treating the transfer as XAUT. Without explicit permission, an unknown asset returns 409. If XAUT is already known, the invoice stays XAUT-specific even with this permission. No XAUT channel, payment, or send operation is created by these endpoints.
+
+### Server-side on-chain receiving
+
+While Fastify is listening, it checks for pending incoming RGB transfers every 20 seconds and refreshes the wallet automatically, including unknown-asset receipts. Refreshes never overlap; errors back off up to 120 seconds. Shutdown waits for an active refresh. The node must remain running and unlocked. The sender may also need to refresh before broadcasting.
+
+New on-chain USDT/XAUT invoices save their recipient, expected contract, amount, expiry and node identity in the existing local SQLite database. Tracking survives server restarts. Check using the `recipientId` returned by invoice creation:
+
+```sh
+curl -sS -G http://127.0.0.1:3101/api/rgb/transfers/status --data-urlencode 'recipientId=PASTE_RECIPIENT_ID'
+```
+
+`paid` is true only for a settled incoming transfer with the expected contract and exact requested amount (or a positive fungible amount for amount-free invoices). The response includes actual asset, amount in base units, transaction ID, status and refresh health. Unknown-asset XAUT invoices are not considered paid merely because some asset arrived. Status queries do not trigger a refresh themselves.
+
+Invoices created before tracking was added are still refreshed and can be inspected by recipient, but return `tracked: false` and `paid: false`: their original intent was not persisted. Do not issue another invoice or send again merely to obtain a tracked record. An invoice-creation persistence error is uncertain; inspect node transfers before retrying. This API remains local and unauthenticated; do not expose it publicly.
