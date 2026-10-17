@@ -8,6 +8,12 @@
     "test": "node --import tsx --test src/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": { "fastify": "^5.0.0" },
-  "devDependencies": { "@types/node": "^22.0.0", "tsx": "^4.20.0" }
+  "dependencies": {
+    "fastify": "^5.0.0",
+    "kaleido-sdk": "0.1.23"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.20.0"
+  }
 }
