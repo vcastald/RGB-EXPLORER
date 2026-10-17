@@ -3,10 +3,14 @@ import { Header } from './components/Header'
 import { Dashboard } from './components/Dashboard'
 import sampleTransactionsData from './data/transactions.json'
 import { Transaction } from './types/transaction'
+import { useNodeStatus } from './hooks/useNodeStatus'
 
 export default function App() {
   const [apiStatus, setApiStatus] = useState<string>('Checking…')
   const [transactions] = useState<Transaction[]>(sampleTransactionsData as Transaction[])
+
+  // Live node status hook querying /api/node/status
+  const { isOnline, pubkey, refresh: refreshNode } = useNodeStatus(15000)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -24,10 +28,19 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-400 selection:text-slate-950">
-      <Header apiStatus={apiStatus} />
+      <Header
+        apiStatus={apiStatus}
+        nodeOnline={isOnline}
+        nodePubkey={pubkey}
+        onRefreshNode={refreshNode}
+      />
       
       <main className="flex-1">
-        <Dashboard transactions={transactions} />
+        <Dashboard
+          transactions={transactions}
+          nodeOnline={isOnline}
+          nodePubkey={pubkey}
+        />
       </main>
 
       <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-400">
