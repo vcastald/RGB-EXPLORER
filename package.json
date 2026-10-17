@@ -1,12 +1,17 @@
 {
   "name": "rgb-explorer",
   "private": true,
-  "workspaces": ["apps/*"],
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "dev": "concurrently -k -n api,web -c blue,green \"npm run dev -w @rgb/api\" \"npm run dev -w @rgb/web\"",
     "build": "npm run build -w @rgb/web",
     "typecheck": "npm run typecheck --workspaces",
-    "test": "npm run test -w @rgb/api"
+    "test": "npm run test -w @rgb/api",
+    "node:setup": "node scripts/node-setup.mjs",
+    "node:stop": "docker compose -f compose.node.yaml stop",
+    "node:status": "docker compose -f compose.node.yaml ps"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

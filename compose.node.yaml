@@ -1,0 +1,12 @@
+name: rgb-explorer-node
+services:
+  node:
+    image: kaleidoswap/rgb-lightning-node@sha256:4676ed77dd97c7ec3043e660cf8aa834463b4b0df5eb49045c0575b91c3f4737
+    network_mode: bridge
+    command: ["/data", "--daemon-listening-port", "3901", "--ldk-peer-listening-port", "10091", "--disable-authentication", "--network", "signetcustom"]
+    ports:
+      - "127.0.0.1:3901:3901"
+      - "127.0.0.1:10091:10091"
+    volumes:
+      - ./.local-node/data:/data
+    restart: "no"
