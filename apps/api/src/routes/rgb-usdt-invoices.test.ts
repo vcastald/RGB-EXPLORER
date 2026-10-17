@@ -22,3 +22,20 @@ test('on-chain errors distinguish invalid amounts, prerequisites and node failur
     finally { await app.close() }
   }
 })
+
+test('USDT route forwards bootstrap permission to fresh-wallet service', async () => {
+  const { RgbUsdtInvoiceService } = await import('../services/rgb-usdt-invoices.js')
+  const service = new RgbUsdtInvoiceService({
+    getNetworkInfo: async () => ({ network: 'SignetCustom' }),
+    listAssets: async () => ({ nia: [] }),
+    createRgbInvoice: async () => ({ invoice: 'rgb:bootstrap', recipient_id: 'r', batch_transfer_idx: 1, expiration_timestamp: 9999999999 }),
+  } as never)
+  const app = createApp({ rgbUsdtInvoiceService: service })
+  try {
+    const res = await app.inject({ method: 'POST', url: '/api/rgb/usdt/invoices', payload: { allowAnyAsset: true } })
+    assert.equal(res.statusCode, 201)
+    assert.equal(res.json().anyAsset, true)
+    assert.equal(res.json().assetId, null)
+    assert.equal((await app.inject({ method: 'POST', url: '/api/rgb/usdt/invoices', payload: { amountUsdt: '0.1', allowAnyAsset: true } })).statusCode, 400)
+  } finally { await app.close() }
+})

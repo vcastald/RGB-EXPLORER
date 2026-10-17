@@ -65,7 +65,7 @@ export function createApp(options: { nodeUrl?: string; fetchNode?: typeof fetch;
   registerRgbReceivingRoutes(app)
 
   const liveRgbInvoices = options.rgbUsdtInvoiceService ? undefined : createRgbUsdtInvoiceService(nodeUrl)
-  app.decorate('rgbUsdtInvoiceService', options.rgbUsdtInvoiceService ?? { createInvoice: amount => receiving.service.track(() => liveRgbInvoices!.createInvoice(amount)) })
+  app.decorate('rgbUsdtInvoiceService', options.rgbUsdtInvoiceService ?? { createInvoice: (amount, allowAnyAsset) => receiving.service.track(() => liveRgbInvoices!.createInvoice(amount, allowAnyAsset)) })
   if (liveRgbInvoices) app.addHook('onClose', async () => { await liveRgbInvoices.close() })
   registerRgbUsdtInvoiceRoutes(app)
 

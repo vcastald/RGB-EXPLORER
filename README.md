@@ -171,3 +171,13 @@ curl -sS -G http://127.0.0.1:3101/api/rgb/transfers/status --data-urlencode 'rec
 `paid` is true only for a settled incoming transfer with the expected contract and exact requested amount (or a positive fungible amount for amount-free invoices). The response includes actual asset, amount in base units, transaction ID, status and refresh health. Unknown-asset XAUT invoices are not considered paid merely because some asset arrived. Status queries do not trigger a refresh themselves.
 
 Invoices created before tracking was added are still refreshed and can be inspected by recipient, but return `tracked: false` and `paid: false`: their original intent was not persisted. Do not issue another invoice or send again merely to obtain a tracked record. An invoice-creation persistence error is uncertain; inspect node transfers before retrying. This API remains local and unauthenticated; do not expose it publicly.
+
+#### First USDT receipt on a fresh wallet
+
+No `usdt:setup` or Lightning channel is needed for on-chain receiving. If the wallet does not know USDT yet, explicitly create an amount-free bootstrap invoice:
+
+```sh
+curl -sS http://127.0.0.1:3101/api/rgb/usdt/invoices -H 'Content-Type: application/json' -d '{"allowAnyAsset":true}'
+```
+
+Select **USDT** at the faucet. This invoice accepts **any RGB asset**; the server records the expected USDT contract and only verifies payment against that contract. Do not include `amountUsdt` with bootstrap permission. After receipt and refresh, exact-amount USDT invoices work normally. Without explicit permission, unknown USDT still returns 409 rather than silently relaxing the asset restriction.

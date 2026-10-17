@@ -33,3 +33,17 @@ test('wrong network or unknown asset blocks invoice without generic fallback', a
   await assert.rejects(service.createInvoice(), /Mutinynet/)
   assert.equal(calls.length, 0)
 })
+
+test('fresh USDT wallet supports explicit amount-free bootstrap only', async () => {
+  const { service, calls, node } = fixture()
+  node.listAssets = async () => ({ nia: [], uda: [], cfa: [], ifa: [] })
+  await assert.rejects(service.createInvoice('0.1'), /not known/)
+  await assert.rejects(service.createInvoice('0.1', true), /omit the amount/)
+  assert.equal(calls.length, 0)
+  const result = await service.createInvoice(undefined, true)
+  assert.equal(result.anyAsset, true)
+  assert.equal(result.assetId, null)
+  assert.equal(result.expectedAssetId, MUTINYNET_USDT)
+  assert.match(result.warning!, /any RGB asset/)
+  assert.equal((calls[0] as { asset_id: unknown }).asset_id, null)
+})
