@@ -1,0 +1,45 @@
+import { AssetType } from '../types/transaction'
+
+export function formatAmount(amount: number, asset: AssetType): string {
+  switch (asset) {
+    case 'USDT':
+      return new Intl.NumberFormat('it-IT', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount) + ' USDT'
+    case 'XAUT':
+      return new Intl.NumberFormat('it-IT', {
+        minimumFractionDigits: 3,
+        maximumFractionDigits: 4,
+      }).format(amount) + ' XAUT'
+    case 'BTC':
+      return new Intl.NumberFormat('it-IT', {
+        minimumFractionDigits: 8,
+        maximumFractionDigits: 8,
+      }).format(amount) + ' BTC'
+  }
+}
+
+export function formatTimeAgo(isoDate: string): string {
+  const date = new Date(isoDate)
+  const now = new Date()
+  const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
+
+  if (diffInMinutes < 1) return 'Adesso'
+  if (diffInMinutes < 60) return `${diffInMinutes}m fa`
+  
+  const diffInHours = Math.floor(diffInMinutes / 60)
+  if (diffInHours < 24) return `${diffInHours}h fa`
+  
+  return new Intl.DateTimeFormat('it-IT', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
+export function shortenIdentifier(id: string, start = 6, end = 4): string {
+  if (id.length <= start + end + 3) return id
+  return `${id.slice(0, start)}...${id.slice(-end)}`
+}
