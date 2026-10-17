@@ -83,3 +83,11 @@ curl -X POST http://127.0.0.1:3101/api/wallet/deposit-addresses
 ```
 
 Returns HTTP 201 `{ "address": "...", "network": "SignetCustom", "nodePubkey": "...", "createdAt": "..." }`. **Each POST requests a fresh address** from the same wallet; use it for the first deposit or for subsequent deposits. It does not contact a faucet, fund the wallet, or create a Lightning channel. Addresses are recorded in a local SQLite database (`APP_DB_PATH` in `.env`, default `.local-app/addresses.sqlite`). List recorded addresses for the current wallet with `curl http://127.0.0.1:3101/api/wallet/deposit-addresses`. This database is an app-side record, **not a wallet backup**: node-generated addresses may exist even if saving fails or the process crashes. HTTP 503 means the node is unavailable or not on Mutinynet; HTTP 500 on storage failure means do not blindly retry the request. Only send **Mutinynet test BTC** to these addresses; back up the wallet's node data before funding it. This local dev endpoint has no user authentication—do not expose Fastify publicly.
+
+## Lightning readiness (read-only)
+
+`GET /api/lightning/readiness` returns node identity/network, on-chain spendable BTC in sats, connected peer pubkeys, channels (capacity, usable status, inbound/outbound liquidity in **msat**, optional RGB asset), and `hasUsableOutbound`. The BTC balance is synced on request; it is **not** Lightning liquidity. `hasUsableOutbound` only means a usable channel has positive outbound balance—it does not guarantee a payment route or enough liquidity for any particular amount/asset. No peer connections, orders, or payments are initiated. HTTP 503 means the node is unavailable.
+
+```bash
+curl http://127.0.0.1:3101/api/lightning/readiness
+```
