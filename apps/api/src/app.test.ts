@@ -52,7 +52,7 @@ test('wallet overview returns service response', async () => {
     network: BitcoinNetwork.SignetCustom,
     height: 1,
     pubkey: 'key',
-    btc: { vanilla: { settled: 0, future: 0, spendable: 0 }, colored: { settled: 0, future: 0, spendable: 0 }, cached: true },
+    btc: { vanilla: { settled: 0, future: 0, spendable: 0 }, colored: { settled: 0, future: 0, spendable: 0 }, cached: false },
     assets: [],
     channels: [],
   } satisfies Awaited<ReturnType<WalletService['getOverview']>>

@@ -66,7 +66,7 @@ By default the node API is at `http://127.0.0.1:3901` (Lightning peer port `1009
 
 ## Read-only wallet overview API
 
-`GET /api/wallet/overview` returns `{ observedAt, network, height, pubkey, btc, assets, channels }`. `btc.vanilla` and `btc.colored` are satoshi balances (`settled`, `future`, `spendable`); `btc.cached: true` means the request does **not** trigger a wallet sync. `assets` contains `{ schema, assetId, ticker, name, precision, balance }` and `channels` contains `{ channelId, peerPubkey, status, usable, capacitySat, localBalanceSat, assetId }`. When the node is unavailable or locked, it returns HTTP 503 `{ "error": "Node unavailable" }` (no partial snapshot). The endpoint does not include payment history yet.
+`GET /api/wallet/overview` returns `{ observedAt, network, height, pubkey, btc, assets, channels }`. `btc.vanilla` and `btc.colored` are satoshi balances (`settled`, `future`, `spendable`); `btc.cached: false` means the request syncs the BTC wallet to find recent deposits; the request can take longer if the indexer is slow. `assets` contains `{ schema, assetId, ticker, name, precision, balance }` and `channels` contains `{ channelId, peerPubkey, status, usable, capacitySat, localBalanceSat, assetId }`. When the node is unavailable or locked, it returns HTTP 503 `{ "error": "Node unavailable" }` (no partial snapshot). The endpoint does not include payment history yet.
 
 ```bash
 curl http://127.0.0.1:3101/api/wallet/overview

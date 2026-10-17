@@ -5,7 +5,7 @@ import type { NodeReader } from './kaleido.js'
 import { BitcoinNetwork } from 'kaleido-sdk/rln'
 import { SqliteAddressStore } from '../storage/addresses.js'
 
-test('overview maps an empty node and uses cached BTC balance', async () => {
+test('overview requests a fresh BTC balance', async () => {
   let skipSync: boolean | undefined
   const node = {
     getNodeInfo: async () => ({ pubkey: 'test-key' }),
@@ -19,11 +19,11 @@ test('overview maps an empty node and uses cached BTC balance', async () => {
     listChannels: async () => ({ channels: [] }),
   } satisfies NodeReader
   const result = await new KaleidoService(node, new SqliteAddressStore(':memory:'), () => new Date('2026-10-17T12:00:00Z')).getOverview()
-  assert.equal(skipSync, true)
+  assert.equal(skipSync, false)
   assert.deepEqual(result, {
     observedAt: '2026-10-17T12:00:00.000Z', network: 'SignetCustom', height: 42,
     pubkey: 'test-key',
-    btc: { vanilla: { settled: 0, future: 0, spendable: 0 }, colored: { settled: 0, future: 0, spendable: 0 }, cached: true },
+    btc: { vanilla: { settled: 0, future: 0, spendable: 0 }, colored: { settled: 0, future: 0, spendable: 0 }, cached: false },
     assets: [], channels: [],
   })
 })
