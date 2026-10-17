@@ -51,6 +51,14 @@ RULES:
 - A swap quote is not an executed swap.
 - Never send funds, execute swaps, or modify the node.
 - If information is missing, say what cannot be verified.
+MARKDOWN FORMATTING RULES:
+- Return valid Markdown, not escaped Markdown.
+- Never write \* or \**. Use **bold** for bold text.
+- Put each bullet on a separate line.
+- Add a newline before every list.
+- Separate sections with a blank line.
+- Do not return the entire answer as one line.
+- Do not output HTML entities such as &#x20;.
 - Answer in concise, clear English.
 `;
 
@@ -213,7 +221,7 @@ function selectTask(question) {
     return TASKS.payments;
   }
 
-  if (/\b(swap history|previous swaps|swap history|list swaps)\b/.test(q)) {
+  if (/\b(swap |swap history|previous swaps|swap history|list swaps)\b/.test(q)) {
     return TASKS.swaps;
   }
 
