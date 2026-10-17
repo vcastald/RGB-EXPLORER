@@ -26,3 +26,22 @@ The goal is to simplify RGB business management through AI-powered insights, tre
 - **Integration:** RGB-compatible wallet and infrastructure
 
 *Work completed before the hackathon is available in the `lib/` directory.*
+
+## Local development
+
+Requires Node.js 20.19+ (or 22.12+) and npm.
+
+```bash
+npm install
+npm run dev
+```
+
+Open http://127.0.0.1:5173. Vite proxies `/api` to Fastify on http://127.0.0.1:3101. The sample endpoint is `GET /api/health`.
+
+```bash
+npm run typecheck  # check both workspaces
+npm test           # API smoke test
+npm run build      # frontend bundle in apps/web/dist
+```
+
+Tailwind CSS v4 is configured via the Vite plugin and `apps/web/src/style.css`. The frontend and backend run as separate processes; production hosting/proxy configuration is not included.
