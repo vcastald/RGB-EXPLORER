@@ -18,6 +18,7 @@ const nodeUrl = `http://127.0.0.1:${process.env.RGB_NODE_PORT ?? '3901'}`
 const indexer = 'https://esplora.signet.kaleidoswap.com'
 
 async function main() {
+  console.log(dir)
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
   // Never initialize into an existing data directory without our marker.
   if (!fs.existsSync(markerFile) && fs.existsSync(path.join(dir, 'data')) && fs.readdirSync(path.join(dir, 'data')).length) {

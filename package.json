@@ -16,5 +16,10 @@
   "devDependencies": {
     "concurrently": "^9.2.1",
     "typescript": "^5.9.0"
+  },
+  "dependencies": {
+    "@kaleidorg/mind": "^0.11.1",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@qvac/sdk": "^0.21.1"
   }
 }
