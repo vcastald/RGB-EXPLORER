@@ -14,10 +14,14 @@ import {
   Engine,
   SkillRegistry,
   ToolRegistry,
+  InProcessToolSource,
 } from "@kaleidorg/mind";
 
 import { createQvacProvider } from "@kaleidorg/mind/qvac";
 import { McpToolSource } from "@kaleidorg/mind/mcp";
+
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 // --------------------------------------------------
 // Configuration
@@ -41,6 +45,386 @@ const ALLOWED_TOOLS = [
   "rln_list_swaps",
   "kaleidoswap_get_quote",
 ];
+
+
+const LOCAL_TOOL_NAMES = [
+  "get_target_allocation",
+  "calculate_rebalance",
+];
+
+
+
+
+let readTargetAllocation;
+let readMarketQuotes;
+
+export function configureTreasuryTools(paramsStore, getQuotes) {
+  if (
+    !paramsStore ||
+    typeof paramsStore.getTargetAllocation !== "function"
+  ) {
+    throw new Error("Invalid paramsStore.");
+  }
+
+  if (typeof getQuotes !== "function") {
+    throw new Error("A market quotes provider is required.");
+  }
+
+  readTargetAllocation = () => {
+    const record = paramsStore.getTargetAllocation();
+
+    const target = {
+      btc: record.btc,
+      xaut: record.xaut,
+      usdt: record.usdt,
+    };
+
+    const values = Object.values(target);
+
+    if (
+      !values.every(
+        (value) =>
+          Number.isInteger(value) &&
+          value >= 0 &&
+          value <= 100,
+      ) ||
+      values.reduce((sum, value) => sum + value, 0) !== 100
+    ) {
+      throw new Error("Invalid target allocation in SQLite.");
+    }
+
+    return target;
+  };
+
+  readMarketQuotes = getQuotes;
+}
+
+// --------------------------------------------------
+// Direct read-only MCP client for treasury calculations
+// --------------------------------------------------
+
+let treasuryClient;
+let treasuryTransport;
+
+function buildMcpEnv() {
+  return {
+    ...Object.fromEntries(
+      Object.entries(process.env).filter(
+        ([, value]) => typeof value === "string",
+      ),
+    ),
+    KALEIDO_NETWORK: NETWORK,
+    KALEIDO_SPARK: "0",
+    RLN_NODE_URL: NODE_URL,
+    KALEIDOSWAP_API_URL:
+      "https://api.signet.kaleidoswap.com",
+  };
+}
+
+async function connectTreasuryClient() {
+  treasuryTransport = new StdioClientTransport({
+    command: process.env.KALEIDO_MCP_COMMAND ?? "npx",
+    args: ["-y", "kaleido-mcp"],
+    env: buildMcpEnv(),
+  });
+
+  treasuryClient = new Client({
+    name: "rgb-explorer-treasury",
+    version: "1.0.0",
+  });
+
+  await treasuryClient.connect(treasuryTransport);
+}
+
+async function callTreasuryTool(name, args = {}) {
+  if (!treasuryClient) {
+    throw new Error("Treasury MCP client is not connected.");
+  }
+
+  const result = await treasuryClient.callTool({
+    name,
+    arguments: args,
+  });
+
+  if (result.isError) {
+    const message = (result.content ?? [])
+      .filter((item) => item.type === "text")
+      .map((item) => item.text)
+      .join("\n");
+
+    throw new Error(
+      `MCP tool ${name} failed: ${message || "Unknown error"}`,
+    );
+  }
+
+  if (result.structuredContent !== undefined) {
+    return result.structuredContent;
+  }
+
+  const textContent = (result.content ?? [])
+    .filter((item) => item.type === "text")
+    .map((item) => item.text)
+    .join("\n");
+
+  if (!textContent) {
+    throw new Error(`MCP tool ${name} returned no data.`);
+  }
+
+  try {
+    return JSON.parse(textContent);
+  } catch {
+    throw new Error(
+      `MCP tool ${name} returned data that is not valid JSON.`,
+    );
+  }
+}
+
+function finiteNonNegative(value, field) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    throw new Error(`Missing numeric value for ${field}.`);
+  }
+
+  const number = Number(value);
+
+  if (!Number.isFinite(number) || number < 0) {
+    throw new Error(`Invalid numeric value returned for ${field}.`);
+  }
+
+  return number;
+}
+
+function getAssetAmount(asset, ticker) {
+  const precision = Number(asset.precision);
+  const settled = finiteNonNegative(
+    asset.balance?.settled,
+    `${ticker} settled balance`,
+  );
+
+  if (
+    !Number.isInteger(precision) ||
+    precision < 0 ||
+    precision > 30
+  ) {
+    throw new Error(`Invalid precision for ${ticker}.`);
+  }
+
+  return settled / 10 ** precision;
+}
+
+function findQuote(quotes, pair) {
+  const quote = quotes?.quotes?.find(
+    (item) => item.pair === pair,
+  );
+
+  if (!quote) {
+    throw new Error(`Required market quote ${pair} is unavailable.`);
+  }
+
+  return quote;
+}
+
+async function getCurrentPortfolioValues() {
+  if (typeof readMarketQuotes !== "function") {
+    throw new Error("Treasury market quotes are not configured.");
+  }
+
+  // Retrieve live balances and RGB assets directly from RLN.
+  const [balances, assetsResponse, quotes] = await Promise.all([
+    callTreasuryTool("rln_get_balances", {}),
+    callTreasuryTool("rln_list_assets", {}),
+    readMarketQuotes(),
+  ]);
+
+  if (!balances || typeof balances !== "object") {
+    throw new Error("RLN returned invalid balance data.");
+  }
+
+  const assets = Array.isArray(assetsResponse)
+    ? assetsResponse
+    : assetsResponse?.assets;
+
+  if (!Array.isArray(assets)) {
+    throw new Error("RLN returned an invalid RGB asset list.");
+  }
+
+  const btcUsdt = findQuote(quotes, "BTC/USDT");
+  const usdtXaut = findQuote(quotes, "USDT/XAUT");
+
+  const btcPrice = finiteNonNegative(
+    btcUsdt.price,
+    "BTC/USDT price",
+  );
+
+  const xautPrice = finiteNonNegative(
+    usdtXaut.inversePrice,
+    "XAUT price in USDT",
+  );
+
+  if (btcPrice <= 0 || xautPrice <= 0) {
+    throw new Error("Required market prices must be greater than zero.");
+  }
+
+  const onchain = balances.btc_onchain;
+
+  if (!onchain || typeof onchain !== "object") {
+    throw new Error("RLN did not return BTC on-chain balances.");
+  }
+
+  // Use settled vanilla BTC only. Do not add spendable and settled,
+  // and do not count colored BTC backing RGB assets a second time.
+  const settledSats = finiteNonNegative(
+    onchain.vanilla_settled_sats,
+    "vanilla settled BTC",
+  );
+
+  const lightningSats = finiteNonNegative(
+    balances.lightning_balance_sat,
+    "Lightning BTC",
+  );
+
+  const btcAmount = (settledSats + lightningSats) / 100_000_000;
+
+  let xautAmount = 0;
+  let usdtAmount = 0;
+  const unsupportedAssets = [];
+
+  for (const asset of assets) {
+    const ticker = String(asset.ticker ?? "").toUpperCase();
+
+    if (!ticker) {
+      unsupportedAssets.push("unknown ticker");
+      continue;
+    }
+
+    if (ticker === "XAUT") {
+      xautAmount += getAssetAmount(asset, ticker);
+    } else if (ticker === "USDT") {
+      usdtAmount += getAssetAmount(asset, ticker);
+    } else {
+      // Never silently omit an unpriced asset: doing so would make
+      // the portfolio total and allocation percentages misleading.
+      unsupportedAssets.push(ticker);
+    }
+  }
+
+  if (unsupportedAssets.length > 0) {
+    throw new Error(
+      "Cannot calculate a complete allocation because these RGB " +
+      `assets are not supported by the current valuation logic: ${
+        [...new Set(unsupportedAssets)].join(", ")
+      }.`,
+    );
+  }
+
+    return {
+    currency: "USDT",
+    btc: btcAmount * btcPrice,
+    xaut: xautAmount * xautPrice,
+    usdt: usdtAmount,
+  };
+}
+
+function buildTreasurySource() {
+  return new InProcessToolSource("treasury", [
+    {
+      name: "get_target_allocation",
+      description:
+        "Read the saved BTC, XAUT and USDT target percentages from SQLite.",
+      parameters: {
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+      handler: async () => {
+        if (!readTargetAllocation) {
+          throw new Error("Treasury store is not configured.");
+        }
+
+        return readTargetAllocation();
+      },
+    },
+    {
+      name: "calculate_rebalance",
+      description:
+        "Fetch actual RLN balances, RGB asset holdings and live market quotes, then calculate the portfolio rebalance against the saved SQLite target. No current balances are supplied by the model. This tool never executes a swap.",
+      parameters: {
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+      handler: async () => {
+        if (!readTargetAllocation) {
+          throw new Error("Treasury store is not configured.");
+        }
+
+        const target = readTargetAllocation();
+        const current = await getCurrentPortfolioValues();
+        const assetNames = ["btc", "xaut", "usdt"];
+
+        const totalValue = assetNames.reduce(
+          (sum, asset) => sum + current[asset],
+          0,
+        );
+
+        if (!Number.isFinite(totalValue) || totalValue <= 0) {
+          throw new Error(
+            "The portfolio has no positive valued balance to rebalance.",
+          );
+        }
+
+        const positions = {};
+
+        for (const asset of assetNames) {
+          const currentValue = current[asset];
+          const targetValue = totalValue * target[asset] / 100;
+          const difference = targetValue - currentValue;
+
+          positions[asset] = {
+            targetPercentage: target[asset],
+            currentPercentage: currentValue / totalValue * 100,
+            currentValue,
+            targetValue,
+            difference,
+            action:
+              Math.abs(difference) < 0.01
+                ? "hold"
+                : difference > 0
+                  ? "buy"
+                  : "sell",
+          };
+        }
+
+        return {
+          currency: "USDT",
+          totalValue,
+          targetAllocation: target,
+          positions,
+          dataSources: [
+            "RLN wallet balances",
+            "RLN RGB asset balances",
+            "KaleidoSwap market quotes",
+            "SQLite target allocation",
+          ],
+          assumptions: [
+            "Uses vanilla_settled_sats for on-chain BTC; does not add spendable and settled.",
+            "Adds the Lightning balance separately.",
+            "Values RGB holdings using their settled raw balance divided by 10^precision.",
+            "Only BTC, XAUT and USDT are supported by this allocation calculation.",
+          ],
+          executed: false,
+          note:
+            "Calculation only. No swap, transfer or transaction was executed.",
+        };
+      },
+    },
+  ]);
+}
+
+
 
 // --------------------------------------------------
 // System prompt
@@ -80,7 +464,11 @@ BALANCES AND ASSETS
 - Distinguish on-chain BTC, Lightning balances, and RGB assets.
 - Do not add spendable and settled values unless the schema
   establishes that they are separate, non-overlapping amounts.
-- Do not calculate unsupported totals or fiat valuations.
+- For treasury rebalancing, use calculate_rebalance to obtain
+  backend-calculated portfolio values in USDT.
+- Never calculate market valuations independently when the
+  treasury tool can provide them.
+- Do not use fallback UI prices for treasury calculations.
 - Preserve the original units returned by the tools.
 
 TRANSFERS AND PAYMENTS
@@ -282,6 +670,19 @@ available tools cover only the operation types they return.
 Do not invent a generic transaction record or tool.
 `;
 
+const TREASURY_SKILL = `
+---
+name: treasury-allocation
+description: Inspect target allocation and calculate portfolio rebalancing.
+tools: get_target_allocation, calculate_rebalance
+triggers: treasury, rebalance, rebalancing, target allocation, target percentages
+---
+
+Call get_target_allocation to retrieve the saved percentages.
+Never guess or modify the saved allocation.
+Distinguish target percentages from actual wallet balances.
+`;
+
 // --------------------------------------------------
 // Task router
 // --------------------------------------------------
@@ -377,6 +778,28 @@ Do not claim to have complete Bitcoin on-chain transaction
 history because no such generic tool is configured here.
 `,
   },
+  
+rebalance: {
+  tools: [
+    "get_target_allocation",
+    "calculate_rebalance",
+  ],
+  instructions: `
+Inspect the saved treasury allocation or calculate a rebalance.
+
+Use get_target_allocation to read the saved target percentages.
+For a rebalance calculation, call calculate_rebalance without
+supplying current balances or prices.
+
+The backend retrieves RLN balances, RGB holdings and market quotes.
+Explain the current and target percentages and the differences.
+If a required balance, asset or quote is unavailable, report the
+limitation instead of inventing a value.
+
+This task is read-only. Never execute a swap or transaction.
+`,
+},
+
 };
 
 function selectTask(question) {
@@ -424,6 +847,13 @@ function selectTask(question) {
     return TASKS.node;
   }
 
+   if (
+    /\b(rebalance|rebalancing|target allocation|treasury allocation|target percentages)\b/.test(q)
+  ) {
+    return TASKS.rebalance;
+  }
+
+
   if (
     /\b(balance|balances|portfolio|holdings|wallet|asset|assets|RGB|USDT|XAUT)\b/i.test(q)
   ) {
@@ -464,10 +894,10 @@ function buildSkills() {
   registry.addMarkdown(SWAP_HISTORY_SKILL.trim());
   registry.addMarkdown(SWAP_SKILL.trim());
   registry.addMarkdown(TRANSACTION_SKILL.trim());
+  registry.addMarkdown(TREASURY_SKILL.trim());
 
   return registry;
 }
-
 // --------------------------------------------------
 // MCP source
 // --------------------------------------------------
@@ -506,11 +936,17 @@ async function initializeAgentInternal() {
   console.log("Connecting to Kaleido MCP...");
 
   kaleido = buildMcpSource();
-
   await kaleido.connect();
   mcpConnected = true;
 
-  const tools = new ToolRegistry([kaleido]);
+  await connectTreasuryClient();
+
+  const treasury = buildTreasurySource();
+
+  const tools = new ToolRegistry([
+    kaleido,
+    treasury,
+  ]);
 
   console.log("Available read-only tools:", ALLOWED_TOOLS);
   console.log("Loading Qwen 3.5 2B...");
@@ -625,15 +1061,20 @@ Never fill gaps in tool results with assumptions.
   // 1. Globally allowlisted MCP tools.
   // 2. Tools selected for this task.
   // 3. Tools exposed by the selected skill.
+  
   const taskToolSet = new Set(task.tools);
   const skillToolSet = new Set(skillTools);
   const globalToolSet = new Set(ALLOWED_TOOLS);
+  const localToolSet = new Set(LOCAL_TOOL_NAMES);
 
   const allowedTools = task.tools.filter(
     (name) =>
       taskToolSet.has(name) &&
       skillToolSet.has(name) &&
-      globalToolSet.has(name),
+      (
+        globalToolSet.has(name) ||
+        localToolSet.has(name)
+      ),
   );
 
   if (allowedTools.length === 0) {
@@ -642,6 +1083,7 @@ Never fill gaps in tool results with assumptions.
       "Check the skill frontmatter and composeSkill result.",
     );
   }
+
 
   const messages = [
     { role: "system", content: system },
@@ -719,6 +1161,18 @@ async function closeResources() {
       await kaleido.close();
     } catch (error) {
       console.error("Error closing Kaleido MCP:", error);
+    }
+  }
+
+  if (treasuryClient) {
+    const client = treasuryClient;
+    treasuryClient = undefined;
+    treasuryTransport = undefined;
+
+    try {
+      await client.close();
+    } catch (error) {
+      console.error("Error closing treasury MCP client:", error);
     }
   }
 
