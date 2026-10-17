@@ -5,7 +5,9 @@ import { createKaleidoService } from './services/kaleido.js'
 import { registerWalletRoutes } from './routes/wallet.js'
 import { registerQuotesRoutes } from './routes/quotes.js'
 import { registerLightningRoutes } from './routes/lightning.js'
+import { registerParamsRoutes } from './routes/params.js'
 import { createLightningService } from './services/lightning.js'
+import { SqliteParamsStore, type ParamsStore } from './storage/params.js'
 import type { LightningReadinessService } from './services/lightning.js'
 import type { WalletService } from './services/kaleido.js'
 import { registerChatRoutes } from './routes/chat.js'
@@ -14,10 +16,18 @@ declare module 'fastify' {
   interface FastifyInstance {
     kaleidoService: WalletService
     lightningService: LightningReadinessService
+    paramsStore: ParamsStore
   }
 }
 
-export function createApp(options: { nodeUrl?: string; fetchNode?: typeof fetch; kaleidoService?: WalletService; lightningService?: LightningReadinessService } = {}) {
+export function createApp(options: {
+  nodeUrl?: string
+  fetchNode?: typeof fetch
+  kaleidoService?: WalletService
+  lightningService?: LightningReadinessService
+  paramsStore?: ParamsStore
+  paramsDbPath?: string
+} = {}) {
   const app = Fastify({ logger: true })
   const nodeUrl = options.nodeUrl ?? process.env.RGB_NODE_URL ?? `http://${process.env.RGB_NODE_HOST ?? '127.0.0.1'}:${process.env.RGB_NODE_PORT ?? '3901'}`
   const fetchNode = options.fetchNode ?? fetch
@@ -32,11 +42,19 @@ export function createApp(options: { nodeUrl?: string; fetchNode?: typeof fetch;
   app.decorate('kaleidoService', options.kaleidoService ?? liveService!)
   if (liveService) app.addHook('onClose', async () => { await liveService.close() })
 
+  const paramsDbPath = options.paramsDbPath ?? resolve(projectRoot, process.env.PARAMS_DB_PATH ?? '.local-app/params.sqlite')
+  const liveParamsStore = options.paramsStore ?? new SqliteParamsStore(paramsDbPath)
+  app.decorate('paramsStore', liveParamsStore)
+  if (!options.paramsStore) {
+    app.addHook('onClose', async () => { liveParamsStore.close() })
+  }
+
   app.get('/api/health', async () => ({ status: 'ok' }))
 
   registerWalletRoutes(app)
   registerQuotesRoutes(app)
   registerLightningRoutes(app)
+  registerParamsRoutes(app)
 
   registerChatRoutes(app)
 

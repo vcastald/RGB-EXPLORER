@@ -1,9 +1,10 @@
-import { useState } from 'react'
-import { Transaction, AssetType, Denomination, ChannelLiquidity } from '../types/transaction'
+import { useState, useEffect, useCallback } from 'react'
+import { Transaction, AssetType, Denomination, ChannelLiquidity, TargetAllocation as TargetAllocationType } from '../types/transaction'
 import { AgentChat } from './AgentChat'
 import { TransactionList } from './TransactionList'
 import { AssetPieChart } from './AssetPieChart'
 import { MarketQuotes } from './MarketQuotes'
+import { TargetAllocation } from './TargetAllocation'
 import { useFrame } from '../hooks/useFrame'
 import { LightningIcon } from './Icons'
 import { shortenIdentifier } from '../utils/formatters'
@@ -30,6 +31,69 @@ export function Dashboard({
   const [selectedAsset, setSelectedAsset] = useState<'ALL' | AssetType>('ALL')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [copiedAddress, setCopiedAddress] = useState(false)
+
+  // Target Treasury Allocations for BTC, XAUT, USDT loaded from .local-app/params.sqlite
+  const [targetAllocation, setTargetAllocation] = useState<TargetAllocationType>({
+    btc: 40,
+    xaut: 30,
+    usdt: 30,
+  })
+  const [targetLoading, setTargetLoading] = useState(false)
+
+  // Fetch parameters from params.sqlite DB at startup
+  const fetchTargetAllocation = useCallback(async (signal?: AbortSignal) => {
+    try {
+      setTargetLoading(true)
+      const res = await fetch('/api/params/target-allocation', { signal })
+      if (res.ok) {
+        const data = (await res.json()) as { target?: TargetAllocationType }
+        if (
+          data?.target &&
+          typeof data.target.btc === 'number' &&
+          typeof data.target.xaut === 'number' &&
+          typeof data.target.usdt === 'number'
+        ) {
+          setTargetAllocation({
+            btc: data.target.btc,
+            xaut: data.target.xaut,
+            usdt: data.target.usdt,
+          })
+        }
+      }
+    } catch (err) {
+      if (!(err instanceof Error && err.name === 'AbortError')) {
+        console.warn('Failed to load target allocation from params.sqlite:', err)
+      }
+    } finally {
+      setTargetLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchTargetAllocation(controller.signal)
+    return () => controller.abort()
+  }, [fetchTargetAllocation])
+
+  // Save parameters to SQLite DB and re-read after each modification
+  const handleTargetAllocationChange = async (newTarget: TargetAllocationType): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/params/target-allocation', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTarget),
+      })
+      if (!res.ok) {
+        throw new Error(`Failed to save params to DB: HTTP ${res.status}`)
+      }
+      // Re-read directly from SQLite database to confirm and sync state
+      await fetchTargetAllocation()
+      return true
+    } catch (err) {
+      console.error('Error saving target allocation to params.sqlite:', err)
+      return false
+    }
+  }
 
   const handleCopyAddress = () => {
     if (depositAddress) {
@@ -108,6 +172,13 @@ export function Dashboard({
               </span>
             </button>
           )}
+
+          {/* Desired Target Percentages (BTC, XAUT, USDT) */}
+          <TargetAllocation
+            target={targetAllocation}
+            onChangeTarget={handleTargetAllocationChange}
+            loading={targetLoading}
+          />
 
           {/* Small Currency / Unit Dropdown PopUp */}
           <div className="relative">
@@ -220,6 +291,7 @@ export function Dashboard({
               loading={transactionsLoading}
               quotes={quotes}
               channelLiquidity={channelLiquidity}
+              targetAllocation={targetAllocation}
             />
           </div>
 

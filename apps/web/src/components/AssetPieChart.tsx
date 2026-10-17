@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Transaction, AssetType, Denomination, ChannelLiquidity } from '../types/transaction'
+import { Transaction, AssetType, Denomination, ChannelLiquidity, TargetAllocation as TargetAllocationType } from '../types/transaction'
 import { formatAmount } from '../utils/formatters'
 import type { MarketQuote } from '../hooks/useFrame'
 
@@ -11,6 +11,7 @@ interface AssetPieChartProps {
   loading?: boolean
   quotes?: MarketQuote[]
   channelLiquidity?: ChannelLiquidity | null
+  targetAllocation?: TargetAllocationType
 }
 
 // Fallback rates in USD if quotes are not yet loaded
@@ -53,6 +54,7 @@ export function AssetPieChart({
   loading = false,
   quotes,
   channelLiquidity,
+  targetAllocation,
 }: AssetPieChartProps) {
   const [hoveredAsset, setHoveredAsset] = useState<AssetType | null>(null)
 
@@ -134,6 +136,7 @@ export function AssetPieChart({
         amount: usdtAmount,
         convertedValue: denomination === 'USD' ? usdtUsd : usdtUsd / rates.BTC,
         percent: (usdtUsd / totalUsd) * 100,
+        targetPercent: targetAllocation?.usdt,
         color: '#10b981', // emerald-500
         hoverColor: '#34d399',
       },
@@ -144,6 +147,7 @@ export function AssetPieChart({
         amount: xautAmount,
         convertedValue: denomination === 'USD' ? xautUsd : xautUsd / rates.BTC,
         percent: (xautUsd / totalUsd) * 100,
+        targetPercent: targetAllocation?.xaut,
         color: '#fbbf24', // amber-400
         hoverColor: '#fcd34d',
       },
@@ -154,6 +158,7 @@ export function AssetPieChart({
         amount: btcOnChainAmount,
         convertedValue: denomination === 'USD' ? btcOnChainUsd : btcOnChainAmount,
         percent: (btcOnChainUsd / totalUsd) * 100,
+        targetPercent: targetAllocation?.btc,
         color: '#f97316', // orange-500
         hoverColor: '#fb923c',
       },
@@ -164,6 +169,7 @@ export function AssetPieChart({
         amount: lightningLiquidityBtc,
         convertedValue: denomination === 'USD' ? lnUsd : lightningLiquidityBtc,
         percent: (lnUsd / totalUsd) * 100,
+        targetPercent: targetAllocation?.btc,
         color: '#6366f1', // indigo-500
         hoverColor: '#818cf8',
       },
@@ -186,7 +192,7 @@ export function AssetPieChart({
       totalConverted,
       assets,
     }
-  }, [transactions, denomination, quotes, channelLiquidity])
+  }, [transactions, denomination, quotes, channelLiquidity, targetAllocation])
 
   // Donut SVG parameters
   const radius = 64
@@ -363,7 +369,15 @@ export function AssetPieChart({
                     <div className="text-[10px] text-slate-400">
                       <span className="font-semibold text-slate-300">
                         {formatPercent(item.percent)}
-                      </span>{' '}
+                      </span>
+                      {item.targetPercent != null && (
+                        <span
+                          className="ml-1 text-[9px] font-mono text-slate-400"
+                          title={`Target impostato: ${item.targetPercent}%`}
+                        >
+                          (tgt {item.targetPercent}%)
+                        </span>
+                      )}{' '}
                       (~{formatConverted(item.convertedValue, denomination)})
                     </div>
                   </div>
