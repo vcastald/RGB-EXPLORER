@@ -109,3 +109,21 @@ Only `{"status":"Succeeded"}` proves receipt. These local endpoints have no auth
 The existing failed USDT order is retained in the private journal for refund tracking; `merchant:status` can show it. **Do not repay or retry it.**
 
 Ports and node/API URLs can be configured in `.env`. Keep `.env` private. The local Fastify API has no user authentication; do not publish it.
+
+### USDT receiving capacity (read-only backend stage)
+
+With the API running, `GET /api/lightning/usdt/capacity` reports existing USDT channels **without calling the LSP**. To preview additional whole-USDT inbound capacity, POST `{"additionalUsdt":20}` to `/api/lightning/usdt/estimate`. It checks live LSP capabilities and returns a fee estimate for a separate receiving-only channel (50,000 LSP sats, 20,000 client sats, 20 test-USDT on the LSP side, 13,140 blocks). If the LSP times out, the estimate returns HTTP 503; retry the **lookup** later. No order or payment is created.
+
+These backend endpoints are read-only. **Do not expose this unauthenticated local API publicly.**
+
+For a **separately approved** Mutinynet test-channel purchase, the local terminal has `npm run usdt:setup`: first run reviews the proposed order and requires `CREATE USDT ORDER`; the next run reviews saved final payment terms and requires `PAY USDT <amount>` before broadcasting. `npm run usdt:setup -- --status` only observes the saved order and node USDT channels. By default it uses `https://api.mutinynet2.kaleidoswap.com` and resumes `.local-app/usdt-order-mutinynet2.json` (private, never commit), including the existing successful order. `USDT_LSP_URL` configures the USDT provider independently of BTC; estimates use the same setting. The supported legacy value `https://api.signet.kaleidoswap.com` selects its original `.local-app/usdt-order.json` without overwriting it. Do not delete the journal or lock file after uncertain order/payment submission; reconcile instead of retrying. Miner fee is additional and not independently capped. No order or payment is automatically made by checking capacity/fees. The previous failed USDT orders remain **separate** in `.local-app/merchant-orders.json` and `.local-app/usdt-order.json` and still need refund follow-up. Fastify does not expose order/payment actions; USDT invoices are available through the endpoint below.
+
+### Create a test-USDT Lightning invoice
+
+`POST /api/lightning/usdt/invoices` accepts a decimal-string `amountUsdt` (up to six decimals, 0.000001–1000) and optional `description` (200 characters).
+
+```sh
+curl -sS http://127.0.0.1:3101/api/lightning/usdt/invoices -H 'Content-Type: application/json' -d '{"amountUsdt":"1","description":"Test sale"}'
+```
+
+The invoice requests the specified test-USDT **plus 3,000 sats of BTC carrier**, not a fee-only BTC amount. It expires after 300 seconds. Creation requires an opened, ready, usable channel with enough USDT and BTC inbound capacity on the same channel; capacity is not reserved and settlement is not guaranteed. Returns 201 with `invoice`, `assetId`, `assetAmount` (integer units), `assetPrecision`, `amountUsdt`, `carrierSat`, and `expirySec`; invalid amounts return 400, unavailable capacity/network 409, and node failures 503. No LSP order or payment is created. This local unauthenticated API is not intended for public exposure.
