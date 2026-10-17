@@ -34,3 +34,9 @@ export interface ChannelLiquidity {
   channelsCount: number
 }
 
+export interface TargetAllocation {
+  btc: number
+  xaut: number
+  usdt: number
+}
+
