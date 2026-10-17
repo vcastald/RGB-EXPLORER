@@ -1,7 +1,7 @@
 
 import type { FastifyInstance } from 'fastify'
 import { randomUUID } from 'node:crypto'
-import { ask } from '../services/ai-agent.mjs'
+import { ask, initializeAgent } from "../services/ai-agent.mjs";
 
 interface ChatBody {
   message: string
@@ -41,4 +41,25 @@ export function registerChatRoutes(app: FastifyInstance) {
       })
     }
   })
+
+  app.post("/api/chat/start", async (request, reply) => {
+  try {
+    await initializeAgent();
+
+    return {
+      ready: true,
+      message: "RGB Explorer is ready.",
+    };
+  } catch (error) {
+    request.log.error(error);
+
+    return reply.code(500).send({
+      ready: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to initialize the AI agent.",
+    });
+  }
+});
 }
