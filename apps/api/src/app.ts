@@ -39,12 +39,16 @@ declare module 'fastify' {
   }
 }
 
-export function createApp(options: { nodeUrl?: string; fetchNode?: typeof fetch; kaleidoService?: WalletService; lightningService?: LightningReadinessService; usdtCapacityService?: UsdtCapacityReader; usdtInvoiceService?: UsdtInvoiceCreator; rgbUsdtInvoiceService?: RgbUsdtInvoiceCreator; rgbXautInvoiceService?: RgbXautInvoiceCreator; rgbReceivingService?: RgbReceivingReader } = {}) {
 export function createApp(options: {
   nodeUrl?: string
   fetchNode?: typeof fetch
   kaleidoService?: WalletService
   lightningService?: LightningReadinessService
+  usdtCapacityService?: UsdtCapacityReader
+  usdtInvoiceService?: UsdtInvoiceCreator
+  rgbUsdtInvoiceService?: RgbUsdtInvoiceCreator
+  rgbXautInvoiceService?: RgbXautInvoiceCreator
+  rgbReceivingService?: RgbReceivingReader
   paramsStore?: ParamsStore
   paramsDbPath?: string
 } = {}) {
