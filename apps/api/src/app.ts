@@ -11,6 +11,9 @@ import { SqliteParamsStore, type ParamsStore } from './storage/params.js'
 import type { LightningReadinessService } from './services/lightning.js'
 import type { WalletService } from './services/kaleido.js'
 import { registerChatRoutes } from './routes/chat.js'
+import {
+  configureTreasuryTools,
+} from './services/ai-agent.mjs'
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -49,6 +52,10 @@ export function createApp(options: {
     app.addHook('onClose', async () => { liveParamsStore.close() })
   }
 
+  configureTreasuryTools(
+    app.paramsStore,
+    () => app.kaleidoService.getQuotes(),
+  );
   app.get('/api/health', async () => ({ status: 'ok' }))
 
   registerWalletRoutes(app)
