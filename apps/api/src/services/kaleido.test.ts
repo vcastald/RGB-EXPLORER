@@ -51,3 +51,25 @@ test('address generation returns node-derived address', async () => {
   assert.deepEqual(await service.createDepositAddress(), expected('tb1-test-2'))
   assert.deepEqual(await service.listDepositAddresses(), [expected('tb1-test-2'), expected('tb1-test-1')])
 })
+
+test('quotes maps market pairs to structured quotes', async () => {
+  const market = {
+    listPairs: async () => ({
+      pairs: [
+        { ticker: 'BTC/USDT', price: '80000000000', base: { ticker: 'BTC', precision: 11 }, quote: { ticker: 'USDT', precision: 6 }, is_active: true },
+        { ticker: 'BTC/XAUT', price: '20000000000', base: { ticker: 'BTC', precision: 11 }, quote: { ticker: 'XAUT', precision: 9 }, is_active: true },
+        { ticker: 'XAUT/USDT', price: '4000000000', base: { ticker: 'XAUT', precision: 9 }, quote: { ticker: 'USDT', precision: 6 }, is_active: true },
+      ],
+    }),
+  }
+  const service = new KaleidoService({} as any, new SqliteAddressStore(':memory:'), market as any, () => new Date('2026-10-17T12:00:00Z'))
+  const res = await service.getQuotes()
+  assert.equal(res.quotes.length, 3)
+  assert.equal(res.quotes[0].pair, 'BTC/USDT')
+  assert.equal(res.quotes[0].price, 80000)
+  assert.equal(res.quotes[1].pair, 'BTC/XAUT')
+  assert.equal(res.quotes[1].price, 20)
+  assert.equal(res.quotes[2].pair, 'USDT/XAUT')
+  assert.equal(res.quotes[2].price, 0.00025)
+  assert.equal(res.quotes[2].inversePrice, 4000)
+})

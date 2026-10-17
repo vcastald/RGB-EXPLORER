@@ -35,7 +35,23 @@ export interface QuotesResponse {
 }
 
 export class KaleidoService {
-  constructor(private readonly node: NodeReader, private readonly addresses: AddressStore, private readonly now = () => new Date()) {}
+  private readonly market?: MarketReader | null
+  private readonly now: () => Date
+
+  constructor(
+    private readonly node: NodeReader,
+    private readonly addresses: AddressStore,
+    marketOrNow?: MarketReader | null | (() => Date),
+    now?: () => Date,
+  ) {
+    if (typeof marketOrNow === 'function') {
+      this.market = null
+      this.now = marketOrNow
+    } else {
+      this.market = marketOrNow ?? null
+      this.now = now ?? (() => new Date())
+    }
+  }
 
   async createDepositAddress() {
     const network = await this.node.getNetworkInfo()
@@ -50,22 +66,6 @@ export class KaleidoService {
   async listDepositAddresses() {
     const [network, info] = await Promise.all([this.node.getNetworkInfo(), this.node.getNodeInfo()])
     return this.addresses.list(info.pubkey, network.network)
-  }
-  private readonly market?: MarketReader | null
-  private readonly now: () => Date
-
-  constructor(
-    private readonly node: NodeReader,
-    marketOrNow?: MarketReader | null | (() => Date),
-    now?: () => Date,
-  ) {
-    if (typeof marketOrNow === 'function') {
-      this.market = null
-      this.now = marketOrNow
-    } else {
-      this.market = marketOrNow ?? null
-      this.now = now ?? (() => new Date())
-    }
   }
 
   async getOverview() {
@@ -99,9 +99,6 @@ export class KaleidoService {
       })),
     }
   }
-}
-
-export type WalletService = Pick<KaleidoService, 'getOverview' | 'createDepositAddress' | 'listDepositAddresses'>
 
   async getQuotes(): Promise<QuotesResponse> {
     if (!this.market) {
@@ -164,24 +161,29 @@ export type WalletService = Pick<KaleidoService, 'getOverview' | 'createDepositA
   }
 }
 
-export type OverviewService = Pick<KaleidoService, 'getOverview' | 'getQuotes'>
+export type WalletService = Pick<
+  KaleidoService,
+  'getOverview' | 'createDepositAddress' | 'listDepositAddresses' | 'getQuotes'
+>
 
-export function createKaleidoService(nodeUrl: string, dbPath: string): WalletService & { close(): Promise<void> } {
-  const addresses = new SqliteAddressStore(dbPath)
-  const client = KaleidoClient.create({ nodeUrl, timeout: 5 })
-  const service = new KaleidoService(client.rln, addresses)
+export type OverviewService = WalletService
+
 export function createKaleidoService(
   nodeUrl: string,
+  dbPath: string,
   baseUrl = process.env.KALEIDO_API_URL ?? 'https://api.signet.kaleidoswap.com',
-): OverviewService & { close(): Promise<void> } {
+): WalletService & { close(): Promise<void> } {
+  const addresses = new SqliteAddressStore(dbPath)
   const client = KaleidoClient.create({ nodeUrl, baseUrl, timeout: 5 })
-  const service = new KaleidoService(client.rln, client.maker)
+  const service = new KaleidoService(client.rln, addresses, client.maker)
   return {
     getOverview: () => service.getOverview(),
     createDepositAddress: () => service.createDepositAddress(),
     listDepositAddresses: () => service.listDepositAddresses(),
-    close: async () => { await client.close(); addresses.close() },
     getQuotes: () => service.getQuotes(),
-    close: () => client.close(),
+    close: async () => {
+      await client.close()
+      addresses.close()
+    },
   }
 }

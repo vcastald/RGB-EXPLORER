@@ -3,9 +3,8 @@ import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { createKaleidoService } from './services/kaleido.js'
 import { registerWalletRoutes } from './routes/wallet.js'
-import type { WalletService } from './services/kaleido.js'
 import { registerQuotesRoutes } from './routes/quotes.js'
-import type { OverviewService } from './services/kaleido.js'
+import type { WalletService } from './services/kaleido.js'
 
 declare module 'fastify' {
   interface FastifyInstance {
