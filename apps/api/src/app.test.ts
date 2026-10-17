@@ -46,6 +46,19 @@ const fakeAddress = (address: string) => ({
   createdAt: '2026-10-17T12:00:00.000Z',
 })
 
+const emptyPayments = async () => ({
+  observedAt: '2026-10-17T12:00:00.000Z',
+  payments: [],
+  channelLiquidity: {
+    totalCapacitySat: 0,
+    localBalanceSat: 0,
+    remoteBalanceSat: 0,
+    localBalanceBtc: 0,
+    capacityBtc: 0,
+    channelsCount: 0,
+  },
+})
+
 test('wallet overview returns service response', async () => {
   const overview = {
     observedAt: '2026-10-17T12:00:00.000Z',
@@ -64,6 +77,7 @@ test('wallet overview returns service response', async () => {
       listDepositAddresses: async () => [],
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
       listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: emptyPayments,
     },
   })
   try {
@@ -83,6 +97,7 @@ test('wallet overview returns 503 when node fails', async () => {
       listDepositAddresses: async () => [],
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
       listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: emptyPayments,
     },
   })
   try {
@@ -103,6 +118,7 @@ test('deposit address route creates a new address with POST', async () => {
       listDepositAddresses: async () => [fakeAddress('tb1-test-1')],
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
       listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: emptyPayments,
     },
   })
   try {
@@ -126,6 +142,7 @@ test('deposit address route returns 503 when the node fails', async () => {
       listDepositAddresses: async () => { throw new Error('offline') },
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
       listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: emptyPayments,
     },
   })
   try {
@@ -145,6 +162,7 @@ test('deposit address route flags a storage failure without implying retry is sa
       listDepositAddresses: async () => [],
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
       listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: emptyPayments,
     },
   })
   try {
@@ -177,6 +195,7 @@ test('quotes endpoint returns market quotes', async () => {
       listDepositAddresses: async () => [],
       getQuotes: async () => quotesRes,
       listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: emptyPayments,
     },
   })
   try {
@@ -222,6 +241,7 @@ test('transactions endpoint returns node transactions', async () => {
       listDepositAddresses: async () => [],
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
       listTransactions: async () => txData,
+      listPayments: emptyPayments,
     },
   })
   try {
@@ -232,6 +252,67 @@ test('transactions endpoint returns node transactions', async () => {
     const resAlias = await app.inject('/api/transactions')
     assert.equal(resAlias.statusCode, 200)
     assert.deepEqual(resAlias.json(), txData)
+  } finally {
+    await app.close()
+  }
+})
+
+test('payments endpoint returns lightning payments and channel liquidity', async () => {
+  const paymentsData = {
+    observedAt: '2026-10-17T12:00:00.000Z',
+    payments: [
+      {
+        id: 'pay-1',
+        paymentHash: 'pay-1',
+        timestamp: '2026-10-17T12:00:00.000Z',
+        asset: 'BTC',
+        amount: 0.00001,
+        unit: 'BTC',
+        amtMsat: 1000000,
+        assetAmount: null,
+        assetId: null,
+        direction: 'incoming' as const,
+        status: 'settled' as const,
+        payeePubkey: '021638f19de2140cf23db6efcf8ef30a2e5e542ed32112c53b4e14b538742d70a2',
+        preimage: 'preimage-1',
+        description: 'test payment',
+        sender: {
+          name: 'Lightning Payment Received',
+          identifier: '021638f19de2140cf23db6efcf8ef30a2e5e542ed32112c53b4e14b538742d70a2',
+          type: 'node' as const,
+        },
+        memo: 'test payment',
+        paymentType: 'lightning' as const,
+      },
+    ],
+    channelLiquidity: {
+      totalCapacitySat: 50000,
+      localBalanceSat: 3100,
+      remoteBalanceSat: 46900,
+      localBalanceBtc: 0.000031,
+      capacityBtc: 0.0005,
+      channelsCount: 1,
+    },
+  }
+
+  const app = createApp({
+    kaleidoService: {
+      getOverview: async () => ({} as any),
+      createDepositAddress: async () => ({} as any),
+      listDepositAddresses: async () => [],
+      getQuotes: async () => ({ observedAt: '', quotes: [] }),
+      listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: async () => paymentsData,
+    },
+  })
+  try {
+    const resWallet = await app.inject('/api/wallet/payments')
+    assert.equal(resWallet.statusCode, 200)
+    assert.deepEqual(resWallet.json(), paymentsData)
+
+    const resAlias = await app.inject('/api/payments')
+    assert.equal(resAlias.statusCode, 200)
+    assert.deepEqual(resAlias.json(), paymentsData)
   } finally {
     await app.close()
   }

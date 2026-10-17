@@ -32,7 +32,7 @@ export function CheckCircleIcon({ className = 'w-4 h-4' }: { className?: string 
   )
 }
 
-export function AssetBadgeIcon({ asset, className = 'w-5 h-5' }: { asset: 'USDT' | 'XAUT' | 'BTC'; className?: string }) {
+export function AssetBadgeIcon({ asset, className = 'w-5 h-5' }: { asset: 'USDT' | 'XAUT' | 'BTC' | 'BTC_LN'; className?: string }) {
   if (asset === 'USDT') {
     return (
       <span className={`inline-flex items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-xs ring-1 ring-emerald-500/30 ${className}`}>
@@ -44,6 +44,13 @@ export function AssetBadgeIcon({ asset, className = 'w-5 h-5' }: { asset: 'USDT'
     return (
       <span className={`inline-flex items-center justify-center rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs ring-1 ring-amber-500/30 ${className}`}>
         Au
+      </span>
+    )
+  }
+  if (asset === 'BTC_LN') {
+    return (
+      <span className={`inline-flex items-center justify-center rounded-full bg-indigo-500/20 text-indigo-300 font-bold text-xs ring-1 ring-indigo-500/30 ${className}`}>
+        ⚡
       </span>
     )
   }

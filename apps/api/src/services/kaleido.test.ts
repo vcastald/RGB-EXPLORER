@@ -18,6 +18,7 @@ test('overview requests a fresh BTC balance', async () => {
     listAssets: async () => ({ nia: [], uda: [], cfa: [], ifa: [] }),
     listChannels: async () => ({ channels: [] }),
     listTransactions: async () => ({ transactions: [] }),
+    listPayments: async () => ({ payments: [] }),
   } satisfies NodeReader
   const result = await new KaleidoService(node, new SqliteAddressStore(':memory:'), () => new Date('2026-10-17T12:00:00Z')).getOverview()
   assert.equal(skipSync, true)
@@ -101,4 +102,77 @@ test('listTransactions maps on-chain transactions to normalized BTC records', as
   assert.equal(tx.asset, 'BTC')
   assert.equal(tx.direction, 'incoming')
   assert.equal(tx.status, 'settled')
+})
+
+test('listPayments maps node payments and channel liquidity', async () => {
+  const node = {
+    listPayments: async () => ({
+      payments: [
+        {
+          amt_msat: 1000000,
+          asset_amount: null,
+          asset_id: null,
+          payment_hash: '94271e2152dcb1d343d77f7175aaebb4a806718d349de9416f5b9b1bf04999f8',
+          inbound: true,
+          status: 'Succeeded' as any,
+          created_at: 1770000000,
+          updated_at: 1770000050,
+          payee_pubkey: '021638f19de2140cf23db6efcf8ef30a2e5e542ed32112c53b4e14b538742d70a2',
+          preimage: 'd8fcc2bb7ff482e957d7e4ed2a36f6fa351b794f39bb01853ad770954e99d47a',
+          description: 'test payment',
+        },
+      ],
+    }),
+    listChannels: async () => ({
+      channels: [
+        {
+          channel_id: 'chan-1',
+          peer_pubkey: 'peer-1',
+          status: 'Opened' as any,
+          ready: true,
+          capacity_sat: 50000,
+          local_balance_sat: 3100,
+          outbound_balance_msat: 2100000,
+          inbound_balance_msat: 45240000,
+          is_usable: true,
+          public: false,
+          asset_id: null,
+          asset_local_amount: null,
+          asset_remote_amount: null,
+        },
+        {
+          channel_id: 'chan-rgb-2',
+          peer_pubkey: 'peer-2',
+          status: 'Opened' as any,
+          ready: true,
+          capacity_sat: 200000,
+          local_balance_sat: 10000,
+          outbound_balance_msat: 0,
+          inbound_balance_msat: 0,
+          is_usable: true,
+          public: false,
+          asset_id: 'rgb:test-asset-id',
+          asset_local_amount: 500,
+          asset_remote_amount: 500,
+        },
+      ],
+    }),
+  } as unknown as NodeReader
+  const service = new KaleidoService(node, new SqliteAddressStore(':memory:'), () => new Date('2026-10-17T12:00:00Z'))
+  const res = await service.listPayments()
+  assert.equal(res.payments.length, 1)
+  const payment = res.payments[0]
+  assert.equal(payment.paymentHash, '94271e2152dcb1d343d77f7175aaebb4a806718d349de9416f5b9b1bf04999f8')
+  assert.equal(payment.amount, 0.00001)
+  assert.equal(payment.asset, 'BTC')
+  assert.equal(payment.direction, 'incoming')
+  assert.equal(payment.status, 'settled')
+  assert.equal(payment.paymentType, 'lightning')
+  assert.equal(payment.memo, 'test payment')
+
+  assert.equal(res.channelLiquidity.channelsCount, 1)
+  assert.equal(res.channelLiquidity.totalCapacitySat, 50000)
+  assert.equal(res.channelLiquidity.localBalanceSat, 3100)
+  assert.equal(res.channelLiquidity.capacityBtc, 0.0005)
+  assert.equal(res.channelLiquidity.localBalanceBtc, 0.000031)
 })

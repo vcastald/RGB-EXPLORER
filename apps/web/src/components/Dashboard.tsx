@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Transaction, AssetType, Denomination } from '../types/transaction'
+import { Transaction, AssetType, Denomination, ChannelLiquidity } from '../types/transaction'
 import { AgentChat } from './AgentChat'
 import { TransactionList } from './TransactionList'
 import { AssetPieChart } from './AssetPieChart'
@@ -15,6 +15,7 @@ interface DashboardProps {
   depositAddress?: string | null
   denomination: Denomination
   onDenominationChange: (val: Denomination) => void
+  channelLiquidity?: ChannelLiquidity | null
 }
 
 export function Dashboard({
@@ -24,6 +25,7 @@ export function Dashboard({
   depositAddress,
   denomination,
   onDenominationChange,
+  channelLiquidity,
 }: DashboardProps) {
   const [selectedAsset, setSelectedAsset] = useState<'ALL' | AssetType>('ALL')
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -209,7 +211,7 @@ export function Dashboard({
 
         {/* Column 3: Pie Chart + Market Quotes */}
         <div className="flex h-auto flex-col gap-4 lg:h-[740px]">
-          <div className="min-h-[380px] lg:min-h-0 lg:flex-[1.15]">
+          <div className="min-h-[380px] lg:min-h-0 lg:flex-[1.25]">
             <AssetPieChart
               transactions={transactions}
               selectedAsset={selectedAsset}
@@ -217,10 +219,11 @@ export function Dashboard({
               denomination={denomination}
               loading={transactionsLoading}
               quotes={quotes}
+              channelLiquidity={channelLiquidity}
             />
           </div>
 
-          <div className="min-h-[320px] lg:min-h-0 lg:flex-1">
+          <div className="min-h-[300px] lg:min-h-0 lg:flex-1">
             <MarketQuotes
               quotes={quotes}
               loading={quotesLoading}

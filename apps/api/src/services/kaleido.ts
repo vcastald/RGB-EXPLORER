@@ -13,6 +13,7 @@ export interface NodeReader {
   listAssets(): ReturnType<Rln['listAssets']>
   listChannels(): ReturnType<Rln['listChannels']>
   listTransactions(): ReturnType<Rln['listTransactions']>
+  listPayments(): ReturnType<Rln['listPayments']>
 }
 
 export interface MarketReader {
@@ -55,6 +56,46 @@ export interface NodeBtcTransaction {
     type: 'node'
   }
   memo: string
+  paymentType?: 'onchain'
+}
+
+export interface NodeLightningPayment {
+  id: string
+  paymentHash: string
+  timestamp: string
+  asset: 'BTC' | string
+  amount: number
+  unit: string
+  amtMsat: number | null
+  assetAmount: number | null
+  assetId: string | null
+  direction: 'incoming' | 'outgoing'
+  status: 'settled' | 'pending' | 'failed'
+  payeePubkey: string
+  preimage?: string | null
+  description: string
+  sender: {
+    name: string
+    identifier: string
+    type: 'node'
+  }
+  memo: string
+  paymentType: 'lightning'
+}
+
+export interface NodeChannelLiquidity {
+  totalCapacitySat: number
+  localBalanceSat: number
+  remoteBalanceSat: number
+  localBalanceBtc: number
+  capacityBtc: number
+  channelsCount: number
+}
+
+export interface PaymentsResponse {
+  observedAt: string
+  payments: NodeLightningPayment[]
+  channelLiquidity: NodeChannelLiquidity
 }
 
 export class KaleidoService {
@@ -153,12 +194,79 @@ export class KaleidoService {
           type: 'node' as const,
         },
         memo: `On-chain ${tx.transaction_type}`,
+        paymentType: 'onchain' as const,
       }
     })
 
     return {
       observedAt: this.now().toISOString(),
       transactions,
+    }
+  }
+
+  async listPayments(): Promise<PaymentsResponse> {
+    const [paymentsRes, channelsRes] = await Promise.all([
+      this.node.listPayments(),
+      this.node.listChannels().catch(() => ({ channels: [] })),
+    ])
+
+    const payments: NodeLightningPayment[] = (paymentsRes.payments ?? []).map((p) => {
+      // Millisatoshis: 1 BTC = 100_000_000_000 msat (1 sat = 1000 msat)
+      const btcAmount = p.amt_msat != null ? p.amt_msat / 100_000_000_000 : 0
+      const isIncoming = Boolean(p.inbound)
+      const timestamp = p.created_at
+        ? new Date(p.created_at * 1000).toISOString()
+        : this.now().toISOString()
+
+      const asset = p.asset_id ? 'RGB' : 'BTC'
+      const amount = p.asset_id && p.asset_amount != null ? p.asset_amount : btcAmount
+      const unit = p.asset_id ? 'RGB' : 'BTC'
+
+      return {
+        id: p.payment_hash,
+        paymentHash: p.payment_hash,
+        timestamp,
+        asset,
+        amount,
+        unit,
+        amtMsat: p.amt_msat ?? null,
+        assetAmount: p.asset_amount ?? null,
+        assetId: p.asset_id ?? null,
+        direction: isIncoming ? 'incoming' : 'outgoing',
+        status: p.status === 'Succeeded' ? 'settled' : p.status === 'Failed' ? 'failed' : 'pending',
+        payeePubkey: p.payee_pubkey,
+        preimage: p.preimage ?? null,
+        description: p.description ?? '',
+        sender: {
+          name: isIncoming ? 'Lightning Payment Received' : 'Lightning Payment Sent',
+          identifier: p.payee_pubkey || p.payment_hash,
+          type: 'node' as const,
+        },
+        memo: p.description || (isIncoming ? 'Lightning payment received' : 'Lightning payment sent'),
+        paymentType: 'lightning' as const,
+      }
+    })
+
+    const channels = channelsRes?.channels ?? []
+    // Filter strictly to native Bitcoin Lightning channels (excluding RGB asset channels)
+    const btcChannels = channels.filter((ch) => !ch.asset_id)
+    const totalCapacitySat = btcChannels.reduce((sum, ch) => sum + (ch.capacity_sat ?? 0), 0)
+    const localBalanceSat = btcChannels.reduce((sum, ch) => sum + (ch.local_balance_sat ?? 0), 0)
+    const remoteBalanceSat = Math.max(0, totalCapacitySat - localBalanceSat)
+
+    const channelLiquidity: NodeChannelLiquidity = {
+      totalCapacitySat,
+      localBalanceSat,
+      remoteBalanceSat,
+      localBalanceBtc: localBalanceSat / 100_000_000,
+      capacityBtc: totalCapacitySat / 100_000_000,
+      channelsCount: btcChannels.length,
+    }
+
+    return {
+      observedAt: this.now().toISOString(),
+      payments,
+      channelLiquidity,
     }
   }
 
@@ -225,7 +333,7 @@ export class KaleidoService {
 
 export type WalletService = Pick<
   KaleidoService,
-  'getOverview' | 'createDepositAddress' | 'listDepositAddresses' | 'getQuotes' | 'listTransactions'
+  'getOverview' | 'createDepositAddress' | 'listDepositAddresses' | 'getQuotes' | 'listTransactions' | 'listPayments'
 >
 
 export type OverviewService = WalletService
@@ -244,6 +352,7 @@ export function createKaleidoService(
     listDepositAddresses: () => service.listDepositAddresses(),
     getQuotes: () => service.getQuotes(),
     listTransactions: () => service.listTransactions(),
+    listPayments: () => service.listPayments(),
     close: async () => {
       await client.close()
       addresses.close()

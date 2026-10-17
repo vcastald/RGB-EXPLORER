@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Header } from './components/Header'
 import { Dashboard } from './components/Dashboard'
 import sampleTransactionsData from './data/transactions.json'
-import { Transaction, Denomination } from './types/transaction'
+import { Transaction, Denomination, ChannelLiquidity } from './types/transaction'
 import { useNodeStatus } from './hooks/useNodeStatus'
 
 const defaultNonBtcTransactions = (sampleTransactionsData as Transaction[]).filter(
@@ -15,6 +15,7 @@ export default function App() {
   const [transactionsLoading, setTransactionsLoading] = useState<boolean>(true)
   const [denomination, setDenomination] = useState<Denomination>('USD')
   const [depositAddress, setDepositAddress] = useState<string | null>(null)
+  const [channelLiquidity, setChannelLiquidity] = useState<ChannelLiquidity | null>(null)
 
   // Theme state: 'dark' (default) or 'light' (white mode)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -76,15 +77,21 @@ export default function App() {
     }
   }, [])
 
-  // Fetch real on-chain BTC transactions from Kaleido node
+  // Fetch real on-chain BTC transactions and Lightning payments from Kaleido node
   const fetchTransactions = useCallback(async (signal?: AbortSignal) => {
     try {
       setTransactionsLoading(true)
-      const response = await fetch('/api/wallet/transactions', {
-        signal,
-      })
-      if (response.ok) {
-        const data = (await response.json()) as {
+
+      const [txResponse, payResponse] = await Promise.all([
+        fetch('/api/wallet/transactions', { signal }).catch(() => null),
+        fetch('/api/wallet/payments', { signal }).catch(() => null),
+      ])
+
+      let realBtcTransactions: Transaction[] = []
+      let realLightningPayments: Transaction[] = []
+
+      if (txResponse && txResponse.ok) {
+        const data = (await txResponse.json()) as {
           transactions?: Array<{
             id: string
             txid: string
@@ -105,7 +112,7 @@ export default function App() {
         }
 
         if (data && Array.isArray(data.transactions)) {
-          const realBtcTransactions: Transaction[] = data.transactions.map((tx) => ({
+          realBtcTransactions = data.transactions.map((tx) => ({
             id: tx.id || tx.txid,
             txid: tx.txid,
             timestamp: tx.timestamp,
@@ -115,6 +122,7 @@ export default function App() {
             direction: tx.direction,
             status: tx.status,
             blockHeight: tx.blockHeight,
+            paymentType: 'onchain' as const,
             sender: tx.sender || {
               name: tx.direction === 'outgoing' ? 'Bitcoin On-Chain Transfer' : 'Bitcoin On-Chain Deposit',
               identifier: tx.txid,
@@ -122,15 +130,64 @@ export default function App() {
             },
             memo: tx.memo || 'On-chain Bitcoin transaction',
           }))
-
-          const merged = [...realBtcTransactions, ...defaultNonBtcTransactions].sort(
-            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-          )
-          setTransactions(merged)
         }
-      } else {
-        setTransactions((prev) => (prev.length > 0 ? prev : defaultNonBtcTransactions))
       }
+
+      if (payResponse && payResponse.ok) {
+        const data = (await payResponse.json()) as {
+          payments?: Array<{
+            id: string
+            paymentHash: string
+            timestamp: string
+            asset: 'BTC' | string
+            amount: number
+            unit: string
+            direction?: 'incoming' | 'outgoing'
+            status: 'settled' | 'pending' | 'failed'
+            sender?: {
+              name: string
+              identifier: string
+              type?: 'node' | 'business' | 'individual' | 'exchange'
+            }
+            memo?: string
+          }>
+          channelLiquidity?: ChannelLiquidity
+        }
+
+        if (data && data.channelLiquidity) {
+          setChannelLiquidity(data.channelLiquidity)
+        }
+
+        if (data && Array.isArray(data.payments)) {
+          realLightningPayments = data.payments.map((p) => ({
+            id: p.id || p.paymentHash,
+            paymentHash: p.paymentHash,
+            timestamp: p.timestamp,
+            asset: 'BTC' as const,
+            amount: p.amount,
+            unit: p.unit || 'BTC',
+            direction: p.direction,
+            status: p.status === 'failed' ? 'pending' : p.status,
+            paymentType: 'lightning' as const,
+            sender: p.sender || {
+              name: p.direction === 'outgoing' ? 'Lightning Payment Sent' : 'Lightning Payment Received',
+              identifier: p.paymentHash,
+              type: 'node',
+            },
+            memo: p.memo || 'Pagamento Lightning Network',
+          }))
+        }
+      }
+
+      const merged = [
+        ...realBtcTransactions,
+        ...realLightningPayments,
+        ...defaultNonBtcTransactions,
+      ].sort(
+        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      )
+
+      setTransactions(merged)
     } catch (error) {
       if (!(error instanceof Error && error.name === 'AbortError')) {
         setTransactions((prev) => (prev.length > 0 ? prev : defaultNonBtcTransactions))
@@ -196,6 +253,7 @@ export default function App() {
           depositAddress={depositAddress}
           denomination={denomination}
           onDenominationChange={setDenomination}
+          channelLiquidity={channelLiquidity}
         />
       </main>
 

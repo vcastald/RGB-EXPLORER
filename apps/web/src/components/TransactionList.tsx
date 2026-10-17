@@ -20,14 +20,32 @@ export function TransactionList({
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
-      const matchAsset = selectedAsset === 'ALL' || tx.asset === selectedAsset
+      const isLightning =
+        tx.paymentType === 'lightning' ||
+        tx.asset === 'BTC_LN' ||
+        Boolean(tx.paymentHash) ||
+        Boolean(tx.channelId)
+
+      let matchAsset = true
+      if (selectedAsset === 'ALL') {
+        matchAsset = true
+      } else if (selectedAsset === 'BTC_LN') {
+        matchAsset = isLightning && (tx.asset === 'BTC' || tx.asset === 'BTC_LN')
+      } else if (selectedAsset === 'BTC') {
+        matchAsset = (tx.asset === 'BTC' || tx.asset === 'BTC_LN') && !isLightning
+      } else {
+        matchAsset = tx.asset === selectedAsset
+      }
+
       const query = searchQuery.toLowerCase().trim()
       const matchQuery =
         !query ||
         tx.sender.name.toLowerCase().includes(query) ||
         tx.sender.identifier.toLowerCase().includes(query) ||
         (tx.memo && tx.memo.toLowerCase().includes(query)) ||
-        tx.asset.toLowerCase().includes(query)
+        tx.asset.toLowerCase().includes(query) ||
+        (isLightning && 'lightning'.includes(query)) ||
+        (!isLightning && tx.asset === 'BTC' && 'onchain'.includes(query))
 
       return matchAsset && matchQuery
     })
@@ -118,7 +136,18 @@ export function TransactionList({
                 : 'border border-slate-800 bg-slate-950/60 text-slate-400 hover:text-orange-400'
             }`}
           >
-            <span className="font-bold">₿</span> BTC
+            <span className="font-bold">₿</span> On-Chain
+          </button>
+
+          <button
+            onClick={() => onSelectAsset('BTC_LN')}
+            className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium transition-all cursor-pointer ${
+              selectedAsset === 'BTC_LN'
+                ? 'bg-indigo-500 text-white font-bold shadow-sm'
+                : 'border border-slate-800 bg-slate-950/60 text-slate-400 hover:text-indigo-300'
+            }`}
+          >
+            <LightningIcon className="h-3 w-3 text-amber-400" /> Lightning
           </button>
         </div>
       </div>
