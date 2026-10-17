@@ -28,14 +28,14 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
       case 'USDT':
         return {
           label: 'USDT',
-          schema: 'RGB20 (LN)',
+          schema: 'RGB20 ON-CHAIN',
           badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
           amountColor: 'text-emerald-400',
         }
       case 'XAUT':
         return {
           label: 'XAUT',
-          schema: 'RGB20 (LN)',
+          schema: 'RGB20 ON-CHAIN',
           badgeColor: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
           amountColor: 'text-amber-300',
         }
@@ -86,11 +86,31 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
             )}
             <span
               className={`absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-950 ring-1 ring-slate-900 ${
-                isLightning ? 'text-amber-400' : 'text-orange-400'
+                isLightning
+                  ? 'text-amber-400'
+                  : transaction.asset === 'USDT'
+                  ? 'text-emerald-400'
+                  : transaction.asset === 'XAUT'
+                  ? 'text-amber-400'
+                  : 'text-orange-400'
               }`}
-              title={isLightning ? 'Lightning Channel Payment' : 'On-Chain Bitcoin Transaction'}
+              title={
+                isLightning
+                  ? 'Lightning Channel Payment'
+                  : transaction.asset === 'BTC'
+                  ? 'On-Chain Bitcoin Transaction'
+                  : 'On-Chain RGB Transfer'
+              }
             >
-              {isLightning ? <LightningIcon className="h-2 w-2" /> : <span className="text-[8px] font-bold">₿</span>}
+              {isLightning ? (
+                <LightningIcon className="h-2 w-2" />
+              ) : transaction.asset === 'BTC' ? (
+                <span className="text-[8px] font-bold">₿</span>
+              ) : transaction.asset === 'USDT' ? (
+                <span className="text-[8px] font-bold">₮</span>
+              ) : (
+                <span className="text-[7px] font-bold">Au</span>
+              )}
             </span>
           </div>
 

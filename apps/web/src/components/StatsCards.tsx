@@ -28,7 +28,7 @@ export function StatsCards({ transactions }: StatsCardsProps) {
     {
       asset: 'USDT' as const,
       name: 'Tether USD',
-      schema: 'RGB20 on LN',
+      schema: 'RGB20 On-Chain',
       totalFormatted: formatAmount(totalUsdt, 'USDT'),
       count: countUsdt,
       borderClass: 'border-emerald-500/20 hover:border-emerald-500/40',
@@ -38,7 +38,7 @@ export function StatsCards({ transactions }: StatsCardsProps) {
     {
       asset: 'XAUT' as const,
       name: 'Tether Gold',
-      schema: 'RGB20 on LN',
+      schema: 'RGB20 On-Chain',
       totalFormatted: formatAmount(totalXaut, 'XAUT'),
       count: countXaut,
       borderClass: 'border-amber-500/20 hover:border-amber-500/40',

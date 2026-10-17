@@ -59,6 +59,11 @@ const emptyPayments = async () => ({
   },
 })
 
+const emptyTransfers = async () => ({
+  observedAt: '2026-10-17T12:00:00.000Z',
+  transfers: [],
+})
+
 test('wallet overview returns service response', async () => {
   const overview = {
     observedAt: '2026-10-17T12:00:00.000Z',
@@ -78,6 +83,7 @@ test('wallet overview returns service response', async () => {
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
       listTransactions: async () => ({ observedAt: '', transactions: [] }),
       listPayments: emptyPayments,
+      listTransfers: emptyTransfers,
     },
   })
   try {
@@ -98,6 +104,7 @@ test('wallet overview returns 503 when node fails', async () => {
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
       listTransactions: async () => ({ observedAt: '', transactions: [] }),
       listPayments: emptyPayments,
+      listTransfers: emptyTransfers,
     },
   })
   try {
@@ -119,6 +126,7 @@ test('deposit address route creates a new address with POST', async () => {
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
       listTransactions: async () => ({ observedAt: '', transactions: [] }),
       listPayments: emptyPayments,
+      listTransfers: emptyTransfers,
     },
   })
   try {
@@ -143,6 +151,7 @@ test('deposit address route returns 503 when the node fails', async () => {
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
       listTransactions: async () => ({ observedAt: '', transactions: [] }),
       listPayments: emptyPayments,
+      listTransfers: emptyTransfers,
     },
   })
   try {
@@ -163,6 +172,7 @@ test('deposit address route flags a storage failure without implying retry is sa
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
       listTransactions: async () => ({ observedAt: '', transactions: [] }),
       listPayments: emptyPayments,
+      listTransfers: emptyTransfers,
     },
   })
   try {
@@ -196,6 +206,7 @@ test('quotes endpoint returns market quotes', async () => {
       getQuotes: async () => quotesRes,
       listTransactions: async () => ({ observedAt: '', transactions: [] }),
       listPayments: emptyPayments,
+      listTransfers: emptyTransfers,
     },
   })
   try {
@@ -242,6 +253,7 @@ test('transactions endpoint returns node transactions', async () => {
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
       listTransactions: async () => txData,
       listPayments: emptyPayments,
+      listTransfers: emptyTransfers,
     },
   })
   try {
@@ -303,6 +315,7 @@ test('payments endpoint returns lightning payments and channel liquidity', async
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
       listTransactions: async () => ({ observedAt: '', transactions: [] }),
       listPayments: async () => paymentsData,
+      listTransfers: emptyTransfers,
     },
   })
   try {
@@ -313,6 +326,60 @@ test('payments endpoint returns lightning payments and channel liquidity', async
     const resAlias = await app.inject('/api/payments')
     assert.equal(resAlias.statusCode, 200)
     assert.deepEqual(resAlias.json(), paymentsData)
+  } finally {
+    await app.close()
+  }
+})
+
+test('transfers endpoint returns on-chain RGB transfers', async () => {
+  const transfersData = {
+    observedAt: '2026-10-17T12:00:00.000Z',
+    transfers: [
+      {
+        id: 'tx-usdt-1:1',
+        idx: 1,
+        txid: 'tx-usdt-1',
+        timestamp: '2026-10-17T12:00:00.000Z',
+        asset: 'USDT',
+        amount: 250,
+        unit: 'USDT',
+        direction: 'incoming' as const,
+        status: 'settled' as const,
+        kind: 'ReceiveBlind',
+        recipientId: 'blinded-1',
+        receiveUtxo: null,
+        changeUtxo: null,
+        sender: {
+          name: 'RGB On-Chain USDT Deposit',
+          identifier: 'tx-usdt-1',
+          type: 'node' as const,
+        },
+        memo: 'On-chain RGB USDT transfer (ReceiveBlind)',
+        paymentType: 'onchain' as const,
+        assetId: 'rgb:usdt-id',
+      },
+    ],
+  }
+
+  const app = createApp({
+    kaleidoService: {
+      getOverview: async () => ({} as any),
+      createDepositAddress: async () => ({} as any),
+      listDepositAddresses: async () => [],
+      getQuotes: async () => ({ observedAt: '', quotes: [] }),
+      listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: emptyPayments,
+      listTransfers: async () => transfersData,
+    },
+  })
+  try {
+    const resWallet = await app.inject('/api/wallet/transfers')
+    assert.equal(resWallet.statusCode, 200)
+    assert.deepEqual(resWallet.json(), transfersData)
+
+    const resAlias = await app.inject('/api/transfers')
+    assert.equal(resAlias.statusCode, 200)
+    assert.deepEqual(resAlias.json(), transfersData)
   } finally {
     await app.close()
   }

@@ -132,7 +132,7 @@ export function AssetPieChart({
       {
         asset: 'USDT' as AssetType,
         name: 'Tether USD',
-        protocol: 'RGB20 (LN)',
+        protocol: 'RGB20 (On-Chain)',
         amount: usdtAmount,
         convertedValue: denomination === 'USD' ? usdtUsd : usdtUsd / rates.BTC,
         percent: (usdtUsd / totalUsd) * 100,
@@ -143,7 +143,7 @@ export function AssetPieChart({
       {
         asset: 'XAUT' as AssetType,
         name: 'Tether Gold',
-        protocol: 'RGB20 (LN)',
+        protocol: 'RGB20 (On-Chain)',
         amount: xautAmount,
         convertedValue: denomination === 'USD' ? xautUsd : xautUsd / rates.BTC,
         percent: (xautUsd / totalUsd) * 100,
@@ -216,7 +216,7 @@ export function AssetPieChart({
           </span>
         </div>
         <p className="mt-0.5 text-xs text-slate-400">
-          Treasury breakdown across RGB Lightning channels and on-chain Bitcoin node
+          Treasury breakdown across on-chain RGB tokens, on-chain Bitcoin, and Lightning channels
         </p>
       </div>
 

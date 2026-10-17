@@ -150,7 +150,7 @@ export function Dashboard({
           <p className="mt-1 text-sm text-slate-400">
             Monitor incoming cash flows for <strong className="text-emerald-400 font-medium">USDT</strong>,{' '}
             <strong className="text-amber-300 font-medium">XAUT</strong>, and{' '}
-            <strong className="text-orange-400 font-medium">BTC</strong> on RGB-enabled Lightning channels.
+            <strong className="text-orange-400 font-medium">BTC</strong> across on-chain transfers and Lightning channels.
           </p>
         </div>
 

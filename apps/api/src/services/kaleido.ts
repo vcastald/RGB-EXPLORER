@@ -14,6 +14,36 @@ export interface NodeReader {
   listChannels(): ReturnType<Rln['listChannels']>
   listTransactions(): ReturnType<Rln['listTransactions']>
   listPayments(): ReturnType<Rln['listPayments']>
+  listTransfers?(body?: Parameters<Rln['listTransfers']>[0]): ReturnType<Rln['listTransfers']>
+}
+
+export interface NodeRgbTransfer {
+  id: string
+  idx: number
+  txid: string | null
+  timestamp: string
+  asset: 'USDT' | 'XAUT' | 'BTC' | string
+  amount: number
+  unit: string
+  direction: 'incoming' | 'outgoing'
+  status: 'settled' | 'pending' | 'failed'
+  kind: string
+  recipientId: string | null
+  receiveUtxo: string | null
+  changeUtxo: string | null
+  sender: {
+    name: string
+    identifier: string
+    type: 'node' | 'business' | 'individual' | 'exchange'
+  }
+  memo: string
+  paymentType: 'onchain'
+  assetId: string | null
+}
+
+export interface TransfersResponse {
+  observedAt: string
+  transfers: NodeRgbTransfer[]
 }
 
 export interface MarketReader {
@@ -270,6 +300,135 @@ export class KaleidoService {
     }
   }
 
+  async listTransfers(): Promise<TransfersResponse> {
+    if (!this.node.listTransfers) {
+      return { observedAt: this.now().toISOString(), transfers: [] }
+    }
+
+    // 1. Fetch assets to map asset_id -> ticker and precision
+    const assetsRes = await this.node.listAssets().catch(() => ({ nia: [], uda: [], cfa: [], ifa: [] }))
+    const allAssets = [
+      ...(assetsRes?.nia ?? []),
+      ...(assetsRes?.cfa ?? []),
+      ...(assetsRes?.uda ?? []),
+      ...(assetsRes?.ifa ?? []),
+    ]
+
+    const assetMap = new Map<string, { ticker: string; name: string; precision: number }>()
+    for (const a of allAssets) {
+      if (a?.asset_id) {
+        const rawTicker = ('ticker' in a && typeof a.ticker === 'string' && a.ticker ? a.ticker : 'RGB').toUpperCase()
+        const ticker = rawTicker.includes('USDT') ? 'USDT' : rawTicker.includes('XAUT') || rawTicker.includes('GOLD') ? 'XAUT' : rawTicker
+        assetMap.set(a.asset_id, {
+          ticker,
+          name: a.name || ticker,
+          precision: typeof a.precision === 'number' ? a.precision : 0,
+        })
+      }
+    }
+
+    // 2. Query transfers: by asset filter for each known asset, and general filter
+    type RawTransferEntry = {
+      transfer: any
+      assetId: string | null
+    }
+    const rawEntries: RawTransferEntry[] = []
+
+    if (allAssets.length > 0) {
+      const perAssetTransfers = await Promise.all(
+        allAssets.map(async (asset) => {
+          try {
+            const res = await this.node.listTransfers!({ asset_filter: { type: 'Id', value: asset.asset_id } as any })
+            return (res.transfers ?? []).map((t) => ({ transfer: t, assetId: asset.asset_id }))
+          } catch {
+            return []
+          }
+        })
+      )
+      for (const list of perAssetTransfers) {
+        rawEntries.push(...list)
+      }
+    }
+
+    try {
+      const generalRes = await this.node.listTransfers({ asset_filter: { type: 'None' } as any })
+      if (generalRes && Array.isArray(generalRes.transfers)) {
+        for (const t of generalRes.transfers) {
+          if (!rawEntries.some((e) => e.transfer.idx === t.idx)) {
+            rawEntries.push({ transfer: t, assetId: null })
+          }
+        }
+      }
+    } catch {
+      // Ignore if { type: 'None' } is unsupported or returns error
+    }
+
+    // 3. Normalize into NodeRgbTransfer
+    const transfers: NodeRgbTransfer[] = rawEntries.map(({ transfer: t, assetId }) => {
+      const assetInfo = assetId ? assetMap.get(assetId) : null
+      let assetTicker = assetInfo?.ticker ?? 'USDT'
+      if (assetTicker.includes('USDT')) assetTicker = 'USDT'
+      else if (assetTicker.includes('XAUT') || assetTicker.includes('GOLD')) assetTicker = 'XAUT'
+
+      const isOutgoing = t.kind === 'Send' || t.kind === 'Burn'
+      const direction: 'incoming' | 'outgoing' = isOutgoing ? 'outgoing' : 'incoming'
+
+      let rawAmount = 0
+      if (Array.isArray(t.assignments) && t.assignments.length > 0) {
+        rawAmount = t.assignments.reduce((sum: number, a: any) => {
+          return a && typeof a.value === 'number' ? sum + a.value : sum
+        }, 0)
+      } else if (t.requested_assignment && typeof (t.requested_assignment as any).value === 'number') {
+        rawAmount = (t.requested_assignment as any).value
+      }
+
+      const precision = assetInfo?.precision ?? (assetTicker === 'USDT' ? 2 : assetTicker === 'XAUT' ? 4 : 0)
+      const amount = precision > 0 ? rawAmount / 10 ** precision : rawAmount
+
+      const status: 'settled' | 'pending' | 'failed' =
+        t.status === 'Settled'
+          ? 'settled'
+          : t.status === 'Failed'
+          ? 'failed'
+          : 'pending'
+
+      const timestamp = t.created_at
+        ? new Date(t.created_at * 1000).toISOString()
+        : this.now().toISOString()
+
+      const id = t.txid ? `${t.txid}:${t.idx}` : `rgb-transfer-${t.idx}`
+
+      return {
+        id,
+        idx: t.idx,
+        txid: t.txid ?? null,
+        timestamp,
+        asset: assetTicker,
+        amount,
+        unit: assetTicker,
+        direction,
+        status,
+        kind: t.kind || 'Transfer',
+        recipientId: t.recipient_id ?? null,
+        receiveUtxo: t.receive_utxo ?? null,
+        changeUtxo: t.change_utxo ?? null,
+        sender: {
+          name: isOutgoing ? `RGB On-Chain ${assetTicker} Transfer` : `RGB On-Chain ${assetTicker} Deposit`,
+          identifier: t.txid || t.recipient_id || `transfer-${t.idx}`,
+          type: 'node' as const,
+        },
+        memo: `On-chain RGB ${assetTicker} transfer (${t.kind || 'Transfer'})`,
+        paymentType: 'onchain' as const,
+        assetId: assetId ?? null,
+      }
+    })
+
+    return {
+      observedAt: this.now().toISOString(),
+      transfers,
+    }
+  }
+
   async getQuotes(): Promise<QuotesResponse> {
     if (!this.market) {
       throw new Error('Market service not configured')
@@ -333,7 +492,7 @@ export class KaleidoService {
 
 export type WalletService = Pick<
   KaleidoService,
-  'getOverview' | 'createDepositAddress' | 'listDepositAddresses' | 'getQuotes' | 'listTransactions' | 'listPayments'
+  'getOverview' | 'createDepositAddress' | 'listDepositAddresses' | 'getQuotes' | 'listTransactions' | 'listPayments' | 'listTransfers'
 >
 
 export type OverviewService = WalletService
@@ -353,6 +512,7 @@ export function createKaleidoService(
     getQuotes: () => service.getQuotes(),
     listTransactions: () => service.listTransactions(),
     listPayments: () => service.listPayments(),
+    listTransfers: () => service.listTransfers(),
     close: async () => {
       await client.close()
       addresses.close()
