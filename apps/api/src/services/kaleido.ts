@@ -69,11 +69,11 @@ export class KaleidoService {
   }
 
   async getOverview() {
-    // Cached balance avoids triggering a wallet sync during an overview request.
+    // Sync BTC wallet so newly confirmed deposits appear in the overview.
     const [info, network, btc, assets, channels] = await Promise.all([
       this.node.getNodeInfo(),
       this.node.getNetworkInfo(),
-      this.node.getBtcBalance(true),
+      this.node.getBtcBalance(false),
       this.node.listAssets(),
       this.node.listChannels(),
     ])
@@ -83,7 +83,7 @@ export class KaleidoService {
       network: network.network,
       height: network.height,
       pubkey: info.pubkey,
-      btc: { ...btc, cached: true },
+      btc: { ...btc, cached: false },
       assets: Object.entries(assets).flatMap(([schema, entries]) =>
         (entries ?? []).map((asset) =>
           ({ schema, assetId: asset.asset_id, ticker: 'ticker' in asset ? asset.ticker : null,
@@ -174,7 +174,7 @@ export function createKaleidoService(
   baseUrl = process.env.KALEIDO_API_URL ?? 'https://api.signet.kaleidoswap.com',
 ): WalletService & { close(): Promise<void> } {
   const addresses = new SqliteAddressStore(dbPath)
-  const client = KaleidoClient.create({ nodeUrl, baseUrl, timeout: 5 })
+  const client = KaleidoClient.create({ nodeUrl, baseUrl, timeout: 30 })
   const service = new KaleidoService(client.rln, addresses, client.maker)
   return {
     getOverview: () => service.getOverview(),
