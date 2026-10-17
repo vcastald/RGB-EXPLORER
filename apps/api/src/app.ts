@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import { createKaleidoService } from './services/kaleido.js'
 import { registerWalletRoutes } from './routes/wallet.js'
+import { registerQuotesRoutes } from './routes/quotes.js'
 import type { OverviewService } from './services/kaleido.js'
 
 declare module 'fastify' {
@@ -21,6 +22,7 @@ export function createApp(options: { nodeUrl?: string; fetchNode?: typeof fetch;
   app.get('/api/health', async () => ({ status: 'ok' }))
 
   registerWalletRoutes(app)
+  registerQuotesRoutes(app)
 
   app.get('/api/node/status', async (_request, reply) => {
     try {

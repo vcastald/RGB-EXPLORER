@@ -43,7 +43,12 @@ test('wallet overview returns service response', async () => {
   const overview = { observedAt: '2026-10-17T12:00:00.000Z', network: BitcoinNetwork.SignetCustom, height: 1,
     pubkey: 'key', btc: { vanilla: { settled: 0, future: 0, spendable: 0 }, colored: { settled: 0, future: 0, spendable: 0 }, cached: true },
     assets: [], channels: [] } satisfies Awaited<ReturnType<OverviewService['getOverview']>>
-  const app = createApp({ kaleidoService: { getOverview: async () => overview } })
+  const app = createApp({
+    kaleidoService: {
+      getOverview: async () => overview,
+      getQuotes: async () => ({ observedAt: '', quotes: [] }),
+    },
+  })
   try {
     const response = await app.inject('/api/wallet/overview')
     assert.equal(response.statusCode, 200)
@@ -52,10 +57,31 @@ test('wallet overview returns service response', async () => {
 })
 
 test('wallet overview returns 503 when node fails', async () => {
-  const app = createApp({ kaleidoService: { getOverview: async () => { throw new Error('connection refused') } } })
+  const app = createApp({ kaleidoService: { getOverview: async () => { throw new Error('connection refused') }, getQuotes: async () => ({ observedAt: '', quotes: [] }) } })
   try {
     const response = await app.inject('/api/wallet/overview')
     assert.equal(response.statusCode, 503)
     assert.deepEqual(response.json(), { error: 'Node unavailable' })
   } finally { await app.close() }
 })
+
+test('quotes endpoint returns market quotes', async () => {
+  const quotesRes = {
+    observedAt: '2026-10-17T12:00:00.000Z',
+    quotes: [
+      { pair: 'BTC/USDT', baseTicker: 'BTC', quoteTicker: 'USDT', price: 80000, formattedPrice: '80,000.00 USDT', updatedAt: '2026-10-17T12:00:00.000Z' },
+    ],
+  }
+  const app = createApp({
+    kaleidoService: {
+      getOverview: async () => ({} as any),
+      getQuotes: async () => quotesRes,
+    },
+  })
+  try {
+    const response = await app.inject('/api/quotes')
+    assert.equal(response.statusCode, 200)
+    assert.deepEqual(response.json(), quotesRes)
+  } finally { await app.close() }
+})
+

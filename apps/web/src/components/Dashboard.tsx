@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Transaction, AssetType, Denomination } from '../types/transaction'
 import { TransactionList } from './TransactionList'
 import { AssetPieChart } from './AssetPieChart'
+import { MarketQuotes } from './MarketQuotes'
+import { useFrame } from '../hooks/useFrame'
 import { LightningIcon } from './Icons'
 
 interface DashboardProps {
@@ -21,6 +23,14 @@ export function Dashboard({
 }: DashboardProps) {
   const [selectedAsset, setSelectedAsset] = useState<'ALL' | AssetType>('ALL')
   const [dropdownOpen, setDropdownOpen] = useState(false)
+
+  // Polling quotes from Kaleido service every 5 minutes
+  const {
+    quotes,
+    loading: quotesLoading,
+    lastUpdated: quotesLastUpdated,
+    refresh: refreshQuotes,
+  } = useFrame(5 * 60 * 1000)
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
@@ -154,7 +164,7 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* Central Section: Scrollable Transaction List on the Left, Pie Chart on the Right */}
+      {/* Central Section: Scrollable Transaction List on the Left, Pie Chart + Quotes on the Right */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12 items-start">
         {/* Left Column: Smaller scrollable transaction list */}
         <div className="xl:col-span-7">
@@ -165,13 +175,21 @@ export function Dashboard({
           />
         </div>
 
-        {/* Right Column: Pie Chart with Asset Totals */}
-        <div className="xl:col-span-5">
+        {/* Right Column: Pie Chart with Asset Totals, followed by Kaleido Quotes */}
+        <div className="xl:col-span-5 space-y-6">
           <AssetPieChart
             transactions={transactions}
             selectedAsset={selectedAsset}
             onSelectAsset={setSelectedAsset}
             denomination={denomination}
+          />
+
+          {/* Quotes Area below Pie Chart */}
+          <MarketQuotes
+            quotes={quotes}
+            loading={quotesLoading}
+            lastUpdated={quotesLastUpdated}
+            onRefresh={refreshQuotes}
           />
         </div>
       </div>
