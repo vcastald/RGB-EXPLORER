@@ -10,9 +10,49 @@ export default function App() {
   const [apiStatus, setApiStatus] = useState<string>('Checking…')
   const [transactions] = useState<Transaction[]>(sampleTransactionsData as Transaction[])
   const [denomination, setDenomination] = useState<Denomination>('USD')
+  const [depositAddress, setDepositAddress] = useState<string | null>(null)
 
   // Live node status hook querying /api/node/status
-  const { isOnline, pubkey, refresh: refreshNode } = useNodeStatus(15000)
+  const { isOnline, refresh: refreshNode } = useNodeStatus(15000)
+
+  // Fetch deposit address from backend
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function fetchDepositAddress() {
+      try {
+        const response = await fetch('/api/wallet/deposit-addresses', {
+          signal: controller.signal,
+        })
+        if (response.ok) {
+          const data = (await response.json()) as { addresses?: Array<{ address: string }> }
+          if (data.addresses && data.addresses.length > 0) {
+            setDepositAddress(data.addresses[0].address)
+            return
+          }
+          // If no address has been created yet, request a new deposit address
+          const createResponse = await fetch('/api/wallet/deposit-addresses', {
+            method: 'POST',
+            signal: controller.signal,
+          })
+          if (createResponse.ok) {
+            const createData = (await createResponse.json()) as { address?: string }
+            if (createData.address) {
+              setDepositAddress(createData.address)
+            }
+          }
+        }
+      } catch (error) {
+        if (!(error instanceof Error && error.name === 'AbortError')) {
+          // Mock fallback address when backend or node is offline
+          setDepositAddress('tb1pjpua0jlrm4y9t6acdndggu6l0350qnajhp3gwx85us0q9fqkha7q0wa6l3')
+        }
+      }
+    }
+
+    fetchDepositAddress()
+    return () => controller.abort()
+  }, [isOnline])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -33,7 +73,7 @@ export default function App() {
       <Header
         apiStatus={apiStatus}
         nodeOnline={isOnline}
-        nodePubkey={pubkey}
+        depositAddress={depositAddress}
         onRefreshNode={refreshNode}
       />
       
@@ -45,7 +85,7 @@ export default function App() {
           <Dashboard
             transactions={transactions}
             nodeOnline={isOnline}
-            nodePubkey={pubkey}
+            depositAddress={depositAddress}
             denomination={denomination}
             onDenominationChange={setDenomination}
           />

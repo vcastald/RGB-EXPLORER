@@ -5,11 +5,12 @@ import { AssetPieChart } from './AssetPieChart'
 import { MarketQuotes } from './MarketQuotes'
 import { useFrame } from '../hooks/useFrame'
 import { LightningIcon } from './Icons'
+import { shortenIdentifier } from '../utils/formatters'
 
 interface DashboardProps {
   transactions: Transaction[]
   nodeOnline: boolean | null
-  nodePubkey?: string
+  depositAddress?: string | null
   denomination: Denomination
   onDenominationChange: (val: Denomination) => void
 }
@@ -17,12 +18,21 @@ interface DashboardProps {
 export function Dashboard({
   transactions,
   nodeOnline,
-  nodePubkey,
+  depositAddress,
   denomination,
   onDenominationChange,
 }: DashboardProps) {
   const [selectedAsset, setSelectedAsset] = useState<'ALL' | AssetType>('ALL')
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [copiedAddress, setCopiedAddress] = useState(false)
+
+  const handleCopyAddress = () => {
+    if (depositAddress) {
+      navigator.clipboard.writeText(depositAddress)
+      setCopiedAddress(true)
+      setTimeout(() => setCopiedAddress(false), 2000)
+    }
+  }
 
   // Polling quotes from Kaleido service every 5 minutes
   const {
@@ -75,14 +85,23 @@ export function Dashboard({
           </p>
         </div>
 
-        {/* Right side of Headline: pubKey display + Denomination Dropdown PopUp */}
+        {/* Right side of Headline: Deposit Address display + Denomination Dropdown PopUp */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          {nodePubkey && (
-            <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/40 px-3.5 py-2 text-xs">
+          {depositAddress && (
+            <button
+              onClick={handleCopyAddress}
+              title="Clicca per copiare l'indirizzo di deposito completo"
+              className="group flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 px-3 py-2 text-xs transition-all cursor-pointer shadow-sm hover:border-slate-700"
+            >
               <span className="text-amber-400"><LightningIcon className="h-4 w-4" /></span>
-              <span className="text-slate-400">Pubkey:</span>
-              <span className="font-mono text-slate-200 truncate max-w-[150px] sm:max-w-[180px]">{nodePubkey}</span>
-            </div>
+              <span className="text-slate-400">Deposit Addr:</span>
+              <span className="font-mono text-slate-200 group-hover:text-amber-400">
+                {shortenIdentifier(depositAddress, 8, 6)}
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono group-hover:text-white">
+                ({copiedAddress ? 'Copiato!' : 'Copia'})
+              </span>
+            </button>
           )}
 
           {/* Small Currency / Unit Dropdown PopUp */}

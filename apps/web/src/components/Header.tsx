@@ -5,21 +5,21 @@ import { shortenIdentifier } from '../utils/formatters'
 interface HeaderProps {
   apiStatus?: string
   nodeOnline: boolean | null // null = checking
-  nodePubkey?: string
+  depositAddress?: string | null
   onRefreshNode?: () => void
 }
 
 export function Header({
   apiStatus = 'Checking…',
   nodeOnline,
-  nodePubkey,
+  depositAddress,
   onRefreshNode,
 }: HeaderProps) {
   const [copied, setCopied] = useState(false)
 
-  const handleCopyPubkey = () => {
-    if (nodePubkey) {
-      navigator.clipboard.writeText(nodePubkey)
+  const handleCopyAddress = () => {
+    if (depositAddress) {
+      navigator.clipboard.writeText(depositAddress)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
@@ -61,13 +61,13 @@ export function Header({
                 <span className="font-mono text-slate-400">Nodo:</span>
                 <span className="font-semibold text-emerald-400">Online</span>
 
-                {nodePubkey && (
+                {depositAddress && (
                   <button
-                    onClick={handleCopyPubkey}
-                    title="Clicca per copiare la Public Key completa del nodo"
+                    onClick={handleCopyAddress}
+                    title="Clicca per copiare il Deposit Address"
                     className="ml-1 cursor-pointer font-mono text-[11px] text-slate-400 hover:text-amber-400"
                   >
-                    ({copied ? 'Copiata!' : shortenIdentifier(nodePubkey, 4, 4)})
+                    ({copied ? 'Copiato!' : shortenIdentifier(depositAddress, 5, 4)})
                   </button>
                 )}
               </>
