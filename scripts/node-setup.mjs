@@ -3,16 +3,18 @@ import { randomBytes } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadEnvFile } from 'node:process'
 import { KaleidoClient } from 'kaleido-sdk'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 process.chdir(root)
+loadEnvFile(path.join(root, '.env'))
 process.umask(0o077)
 const dir = path.join(root, '.local-node')
 const passwordFile = path.join(dir, 'password')
 const mnemonicFile = path.join(dir, 'mnemonic')
 const markerFile = path.join(dir, 'initialized')
-const nodeUrl = 'http://127.0.0.1:3901'
+const nodeUrl = `http://127.0.0.1:${process.env.RGB_NODE_PORT ?? '3901'}`
 const indexer = 'https://esplora.signet.kaleidoswap.com'
 
 async function main() {
