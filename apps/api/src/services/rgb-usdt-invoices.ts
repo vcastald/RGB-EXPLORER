@@ -41,6 +41,7 @@ export class RgbUsdtInvoiceService {
       batchTransferIdx: result.batch_transfer_idx, expirationTimestamp: result.expiration_timestamp,
       assetId: anyAsset ? null : this.asset.id, assetPrecision: this.asset.precision, assetAmount, amountUsdt: amountUsdt ?? null,
       anyAsset, expectedAssetId: this.asset.id,
+      ...(anyAsset ? { warning: `This invoice accepts any RGB asset. Select ${this.asset.ticker} at the faucet and verify the received contract.` } : {}),
       network: network.network, witness: true, minConfirmations: 1 }
   }
 }
@@ -50,5 +51,5 @@ export function createRgbUsdtInvoiceService(nodeUrl: string) {
   if (!/^rpcs?:\/\//.test(proxy)) throw new Error('RGB_PROXY_ENDPOINT must use rpc:// or rpcs://')
   const client = KaleidoClient.create({ nodeUrl, timeout: 10000 })
   const service = new RgbUsdtInvoiceService(client.rln, proxy)
-  return { createInvoice: (amount?: string) => service.createInvoice(amount), close: () => client.close() }
+  return { createInvoice: (amount?: string, allowAnyAsset?: boolean) => service.createInvoice(amount, allowAnyAsset), close: () => client.close() }
 }
