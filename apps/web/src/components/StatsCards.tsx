@@ -83,13 +83,13 @@ export function StatsCards({ transactions }: StatsCardsProps) {
           </div>
 
           <div className="mt-4">
-            <div className="text-xs font-medium text-slate-400">Totale Ricevuto</div>
+            <div className="text-xs font-medium text-slate-400">Total Received</div>
             <div className={`mt-0.5 text-xl font-bold tracking-tight ${card.textAccent}`}>
               + {card.totalFormatted}
             </div>
             <div className="mt-2 flex items-center text-xs text-slate-400">
               <span className="text-slate-300 font-medium">{card.count}</span>
-              <span className="ml-1 text-slate-400">pagamenti registrati</span>
+              <span className="ml-1 text-slate-400">recorded payments</span>
             </div>
           </div>
         </div>

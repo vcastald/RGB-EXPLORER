@@ -288,7 +288,7 @@ export class KaleidoService {
         baseTicker: 'BTC',
         quoteTicker: 'USDT',
         price,
-        formattedPrice: `${price.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`,
+        formattedPrice: `${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`,
         updatedAt: nowIso,
       })
     }
@@ -302,7 +302,7 @@ export class KaleidoService {
         baseTicker: 'BTC',
         quoteTicker: 'XAUT',
         price,
-        formattedPrice: `${price.toLocaleString('it-IT', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} XAUT`,
+        formattedPrice: `${price.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} XAUT`,
         updatedAt: nowIso,
       })
     }
@@ -317,9 +317,9 @@ export class KaleidoService {
         baseTicker: 'USDT',
         quoteTicker: 'XAUT',
         price: usdtPriceInXaut,
-        formattedPrice: `${usdtPriceInXaut.toLocaleString('it-IT', { minimumFractionDigits: 6, maximumFractionDigits: 8 })} XAUT`,
+        formattedPrice: `${usdtPriceInXaut.toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 8 })} XAUT`,
         inversePrice: xautPriceInUsdt,
-        inverseFormatted: `${xautPriceInUsdt.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`,
+        inverseFormatted: `${xautPriceInUsdt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`,
         updatedAt: nowIso,
       })
     }

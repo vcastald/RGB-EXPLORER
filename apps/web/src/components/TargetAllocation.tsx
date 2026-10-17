@@ -67,7 +67,7 @@ export function TargetAllocation({ target, onChangeTarget, loading = false }: Ta
       setSaveError(null)
       const res = await onChangeTarget(tempTarget)
       if (res === false) {
-        throw new Error('Errore durante il salvataggio nel database')
+        throw new Error('Error saving to database')
       }
       setSavedNotice(true)
       setTimeout(() => {
@@ -75,7 +75,7 @@ export function TargetAllocation({ target, onChangeTarget, loading = false }: Ta
         setIsOpen(false)
       }, 500)
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Errore nel salvataggio')
+      setSaveError(err instanceof Error ? err.message : 'Error saving')
     } finally {
       setIsSaving(false)
     }
@@ -94,7 +94,7 @@ export function TargetAllocation({ target, onChangeTarget, loading = false }: Ta
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="group flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 px-3 py-2 text-xs transition-all cursor-pointer shadow-sm hover:border-slate-700"
-        title="Imposta le percentuali desiderate da ottenere per BTC, XAUT e USDT"
+        title="Set target allocation percentages for BTC, XAUT, and USDT"
       >
         <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500/20 text-indigo-400 group-hover:text-indigo-300">
           <TargetIcon className="h-3 w-3" />
@@ -114,7 +114,7 @@ export function TargetAllocation({ target, onChangeTarget, loading = false }: Ta
           </span>
         </div>
         <span className="text-[10px] text-slate-400 group-hover:text-amber-400 transition-colors ml-0.5">
-          ({isOpen ? 'Chiudi' : 'Modifica'})
+          ({isOpen ? 'Close' : 'Edit'})
         </span>
       </button>
 
@@ -138,14 +138,14 @@ export function TargetAllocation({ target, onChangeTarget, loading = false }: Ta
                 <div>
                   <div className="flex items-center gap-1.5">
                     <h4 className="text-xs font-bold text-white sm:text-sm">
-                      Percentuali Target di Cassa
+                      Treasury Target Allocation
                     </h4>
                     <span className="rounded bg-indigo-500/10 px-1.5 py-0.5 text-[9px] font-mono text-indigo-400 border border-indigo-500/20">
                       params.sqlite
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400">
-                    Quote salvate nel DB locale <code className="text-slate-300 font-mono">.local-app/params.sqlite</code>
+                    Stored in local DB <code className="text-slate-300 font-mono">.local-app/params.sqlite</code>
                   </p>
                 </div>
               </div>
@@ -161,7 +161,7 @@ export function TargetAllocation({ target, onChangeTarget, loading = false }: Ta
             {/* Visual Multi-Asset Segmented Bar */}
             <div className="my-3.5 space-y-1.5">
               <div className="flex items-center justify-between text-[11px] text-slate-400">
-                <span>Ripartizione visiva:</span>
+                <span>Visual distribution:</span>
                 <span className={`font-mono font-bold ${isBalanced ? 'text-emerald-400' : 'text-amber-400'}`}>
                   {total}% {isBalanced ? '✓' : ''}
                 </span>
@@ -340,7 +340,7 @@ export function TargetAllocation({ target, onChangeTarget, loading = false }: Ta
               {isBalanced ? (
                 <div className="flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-400">
                   <span className="flex items-center gap-1.5">
-                    <span className="font-bold">✓</span> Allocazione bilanciata (100%)
+                    <span className="font-bold">✓</span> Balanced allocation (100%)
                   </span>
                 </div>
               ) : (
@@ -348,7 +348,7 @@ export function TargetAllocation({ target, onChangeTarget, loading = false }: Ta
                   <div className="flex items-center gap-1.5">
                     <span>⚠️</span>
                     <span>
-                      Totale: <strong>{total}%</strong>{' '}
+                      Total: <strong>{total}%</strong>{' '}
                       <span className="text-[10px] opacity-80">
                         ({total < 100 ? `-${100 - total}%` : `+${total - 100}%`})
                       </span>
@@ -359,7 +359,7 @@ export function TargetAllocation({ target, onChangeTarget, loading = false }: Ta
                     onClick={handleAutoBalance}
                     className="rounded-lg bg-amber-400/20 hover:bg-amber-400/30 px-2 py-0.5 text-[11px] font-bold text-amber-300 cursor-pointer transition-colors"
                   >
-                    Bilancia al 100%
+                    Balance to 100%
                   </button>
                 </div>
               )}
@@ -368,7 +368,7 @@ export function TargetAllocation({ target, onChangeTarget, loading = false }: Ta
             {/* Quick Preset Buttons */}
             <div className="mt-3">
               <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block mb-1.5">
-                Preset rapidi:
+                Quick presets:
               </span>
               <div className="grid grid-cols-2 gap-1.5 text-[11px]">
                 <button
@@ -377,7 +377,7 @@ export function TargetAllocation({ target, onChangeTarget, loading = false }: Ta
                   className="rounded-lg border border-slate-800 bg-slate-950/60 p-1.5 text-slate-300 hover:border-amber-400/40 hover:text-white transition-all text-left cursor-pointer"
                 >
                   <strong className="block text-white">40 / 30 / 30</strong>
-                  <span className="text-[10px] text-slate-400">Bilanciato</span>
+                  <span className="text-[10px] text-slate-400">Balanced</span>
                 </button>
                 <button
                   type="button"
@@ -393,7 +393,7 @@ export function TargetAllocation({ target, onChangeTarget, loading = false }: Ta
                   className="rounded-lg border border-slate-800 bg-slate-950/60 p-1.5 text-slate-300 hover:border-amber-400/40 hover:text-white transition-all text-left cursor-pointer"
                 >
                   <strong className="block text-white">34 / 33 / 33</strong>
-                  <span className="text-[10px] text-slate-400">Equo ripartito</span>
+                  <span className="text-[10px] text-slate-400">Equal Split</span>
                 </button>
                 <button
                   type="button"
@@ -413,7 +413,7 @@ export function TargetAllocation({ target, onChangeTarget, loading = false }: Ta
                   <span className="text-[11px] text-rose-400 font-medium truncate block">{saveError}</span>
                 )}
                 {loading && !saveError && (
-                  <span className="text-[11px] text-slate-400 italic">Sincronizzazione DB…</span>
+                  <span className="text-[11px] text-slate-400 italic">Syncing DB…</span>
                 )}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
@@ -423,7 +423,7 @@ export function TargetAllocation({ target, onChangeTarget, loading = false }: Ta
                   disabled={isSaving}
                   className="rounded-xl px-3 py-1.5 text-xs text-slate-400 hover:text-white cursor-pointer disabled:opacity-50"
                 >
-                  Annulla
+                  Cancel
                 </button>
                 <button
                   type="button"
@@ -435,7 +435,7 @@ export function TargetAllocation({ target, onChangeTarget, loading = false }: Ta
                       : 'bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 hover:from-amber-300 hover:to-orange-400'
                   }`}
                 >
-                  {isSaving ? 'Salvataggio in DB…' : savedNotice ? '✓ Salvato in DB!' : 'Salva nel DB'}
+                  {isSaving ? 'Saving to DB…' : savedNotice ? '✓ Saved to DB!' : 'Save to DB'}
                 </button>
               </div>
             </div>

@@ -121,9 +121,9 @@ export function Dashboard({
               !
             </span>
             <div>
-              <p className="font-semibold text-rose-200">Nodo Lightning non raggiungibile</p>
+              <p className="font-semibold text-rose-200">Lightning node unreachable</p>
               <p className="text-rose-300/80">
-                Il container Docker su porta 3901 o l&apos;endpoint backend <code className="font-mono bg-rose-950/60 px-1 py-0.5 rounded">/api/node/status</code> non rispondono.
+                The Docker container on port 3901 or the backend endpoint <code className="font-mono bg-rose-950/60 px-1 py-0.5 rounded">/api/node/status</code> is not responding.
               </p>
             </div>
           </div>
@@ -138,19 +138,19 @@ export function Dashboard({
         <div>
           <div className="flex items-center gap-2.5">
             <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              Dashboard Incassi Lightning RGB
+              RGB Lightning Treasury Dashboard
             </h2>
             {nodeOnline === true && (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/20">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-                Nodo Connesso
+                Node Connected
               </span>
             )}
           </div>
           <p className="mt-1 text-sm text-slate-400">
-            Monitora i flussi di cassa in ingresso per <strong className="text-emerald-400 font-medium">USDT</strong>,{' '}
-            <strong className="text-amber-300 font-medium">XAUT</strong> e{' '}
-            <strong className="text-orange-400 font-medium">BTC</strong> sui canali Lightning abilitati RGB.
+            Monitor incoming cash flows for <strong className="text-emerald-400 font-medium">USDT</strong>,{' '}
+            <strong className="text-amber-300 font-medium">XAUT</strong>, and{' '}
+            <strong className="text-orange-400 font-medium">BTC</strong> on RGB-enabled Lightning channels.
           </p>
         </div>
 
@@ -159,7 +159,7 @@ export function Dashboard({
           {depositAddress && (
             <button
               onClick={handleCopyAddress}
-              title="Clicca per copiare l'indirizzo di deposito completo"
+              title="Click to copy full deposit address"
               className="group flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 px-3 py-2 text-xs transition-all cursor-pointer shadow-sm hover:border-slate-700"
             >
               <span className="text-amber-400"><LightningIcon className="h-4 w-4" /></span>
@@ -168,7 +168,7 @@ export function Dashboard({
                 {shortenIdentifier(depositAddress, 8, 6)}
               </span>
               <span className="text-[10px] text-slate-400 font-mono group-hover:text-white">
-                ({copiedAddress ? 'Copiato!' : 'Copia'})
+                ({copiedAddress ? 'Copied!' : 'Copy'})
               </span>
             </button>
           )}
@@ -186,9 +186,9 @@ export function Dashboard({
               type="button"
               onClick={() => setDropdownOpen(!dropdownOpen)}
               className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 px-3 py-2 text-xs font-medium text-slate-200 transition-all cursor-pointer shadow-sm hover:border-slate-700"
-              title="Seleziona la valuta di stima per il controvalore"
+              title="Select valuation currency"
             >
-              <span className="text-slate-400">Valuta:</span>
+              <span className="text-slate-400">Currency:</span>
               <span className={`font-bold flex items-center gap-1 ${denomination === 'USD' ? 'text-emerald-400' : 'text-orange-400'}`}>
                 {denomination === 'USD' ? '$ USD' : '₿ BTC'}
               </span>
@@ -213,7 +213,7 @@ export function Dashboard({
                 {/* PopUp Menu */}
                 <div className="absolute right-0 top-full mt-1.5 z-50 w-44 rounded-xl border border-slate-800 bg-slate-900/95 p-1.5 shadow-2xl backdrop-blur-md animate-fadeIn">
                   <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Controvalore in
+                    Valuation Currency
                   </div>
                   <button
                     type="button"
@@ -229,7 +229,7 @@ export function Dashboard({
                   >
                     <span className="flex items-center gap-2">
                       <span className="text-emerald-400 font-bold text-sm">$</span>
-                      <span>Dollari (USD)</span>
+                      <span>US Dollars (USD)</span>
                     </span>
                     {denomination === 'USD' && <span className="text-emerald-400 text-xs font-bold">✓</span>}
                   </button>

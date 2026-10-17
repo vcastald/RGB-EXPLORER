@@ -62,37 +62,37 @@ export function Header({
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
                 </span>
-                <span className="font-mono text-slate-400">Nodo:</span>
+                <span className="font-mono text-slate-400">Node:</span>
                 <span className="font-semibold text-emerald-400">Online</span>
 
                 {depositAddress && (
                   <button
                     onClick={handleCopyAddress}
-                    title="Clicca per copiare il Deposit Address"
+                    title="Click to copy Deposit Address"
                     className="ml-1 cursor-pointer font-mono text-[11px] text-slate-400 hover:text-amber-400"
                   >
-                    ({copied ? 'Copiato!' : shortenIdentifier(depositAddress, 5, 4)})
+                    ({copied ? 'Copied!' : shortenIdentifier(depositAddress, 5, 4)})
                   </button>
                 )}
               </>
             ) : nodeOnline === false ? (
               <>
                 <span className="h-2 w-2 rounded-full bg-rose-500"></span>
-                <span className="font-mono text-slate-400">Nodo:</span>
+                <span className="font-mono text-slate-400">Node:</span>
                 <span className="font-semibold text-rose-400">Offline</span>
               </>
             ) : (
               <>
                 <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
-                <span className="font-mono text-slate-400">Nodo:</span>
-                <span className="text-amber-400">Verifica…</span>
+                <span className="font-mono text-slate-400">Node:</span>
+                <span className="text-amber-400">Checking…</span>
               </>
             )}
 
             {onRefreshNode && (
               <button
                 onClick={onRefreshNode}
-                title="Ricarica stato nodo"
+                title="Refresh node status"
                 className="ml-1 text-slate-500 hover:text-slate-300 cursor-pointer"
               >
                 ↻
@@ -116,12 +116,12 @@ export function Header({
             </strong>
           </div>
 
-          {/* Theme Toggle Button (White Mode / Dark Mode) */}
+          {/* Theme Toggle Button (Light Mode / Dark Mode) */}
           {onToggleTheme && (
             <button
               type="button"
               onClick={onToggleTheme}
-              title={theme === 'dark' ? 'Passa alla White Mode' : 'Passa alla Dark Mode'}
+              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
               className="relative flex items-center rounded-full border border-slate-800 bg-slate-950/80 p-0.5 text-xs transition-colors hover:border-slate-700 cursor-pointer shadow-sm"
             >
               <div
@@ -142,7 +142,7 @@ export function Header({
                 }`}
               >
                 <SunIcon className="h-3.5 w-3.5 text-amber-500" />
-                <span className="text-[11px] hidden sm:inline">White</span>
+                <span className="text-[11px] hidden sm:inline">Light</span>
               </div>
             </button>
           )}

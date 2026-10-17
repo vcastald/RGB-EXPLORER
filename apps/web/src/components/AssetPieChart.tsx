@@ -26,9 +26,9 @@ function formatConverted(val: number, denomination: Denomination): string {
   if (denomination === 'USD') {
     if (val === 0) return '$0'
     if (val < 10) {
-      return '$' + val.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      return '$' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     }
-    return '$' + Math.round(val).toLocaleString('it-IT')
+    return '$' + Math.round(val).toLocaleString('en-US')
   }
   if (val === 0) return '0 BTC'
   if (val < 0.0001 && val > 0) {
@@ -209,14 +209,14 @@ export function AssetPieChart({
       <div>
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-white sm:text-base">
-            Distribuzione Totale Asset
+            Total Asset Distribution
           </h3>
           <span className="rounded-md bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-300">
-            Valuta: <strong className="text-amber-400">{denomination}</strong>
+            Currency: <strong className="text-amber-400">{denomination}</strong>
           </span>
         </div>
         <p className="mt-0.5 text-xs text-slate-400">
-          Ripartizione fondi tra canali Lightning RGB e nodo Bitcoin On-Chain
+          Treasury breakdown across RGB Lightning channels and on-chain Bitcoin node
         </p>
       </div>
 
@@ -227,7 +227,7 @@ export function AssetPieChart({
             <div className="h-28 w-28 rounded-full border-4 border-slate-800 border-t-amber-400 animate-spin" />
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Loading</span>
-              <span className="text-xs font-semibold text-slate-300">Dati dal nodo…</span>
+              <span className="text-xs font-semibold text-slate-300">Syncing node data…</span>
             </div>
           </div>
 
@@ -315,13 +315,13 @@ export function AssetPieChart({
               ) : (
                 <>
                   <span className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase">
-                    Totale ({denomination})
+                    Total ({denomination})
                   </span>
                   <span className="text-sm sm:text-base font-bold text-white truncate max-w-[120px]">
                     {formatConverted(stats.totalConverted, denomination)}
                   </span>
                   <span className="text-[9px] text-emerald-400 font-medium">
-                    {transactions.length} pagamenti
+                    {transactions.length} transactions
                   </span>
                 </>
               )}
@@ -373,7 +373,7 @@ export function AssetPieChart({
                       {item.targetPercent != null && (
                         <span
                           className="ml-1 text-[9px] font-mono text-slate-400"
-                          title={`Target impostato: ${item.targetPercent}%`}
+                          title={`Target: ${item.targetPercent}%`}
                         >
                           (tgt {item.targetPercent}%)
                         </span>
@@ -393,7 +393,7 @@ export function AssetPieChart({
                 onClick={() => onSelectAsset('ALL')}
                 className="text-[11px] text-amber-400 hover:underline cursor-pointer"
               >
-                ← Mostra tutti gli asset nella lista
+                ← Show all assets in transaction list
               </button>
             </div>
           )}
