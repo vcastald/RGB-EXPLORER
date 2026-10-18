@@ -27,42 +27,107 @@ The goal is to simplify RGB business management through AI-powered insights, tre
 
 *Work completed before the hackathon is available in the `lib/` directory.*
 
-## Local development
+## Prerequisites
 
-Requires Node.js 20.19+ (or 22.12+) and npm.
+Before starting, ensure you have the following installed on your machine:
 
+- **Git**
+- **Node.js** 20.19+ or 22.12+ (Node.js 22+ recommended) and **npm**
+- **Docker & Docker Compose** (Docker Desktop on macOS/Windows, or Docker Engine + Compose on Linux). Docker must be running to host the RGB Lightning node.
+
+---
+
+## Quickstart: Step-by-Step Setup (From Scratch)
+
+If you have just cloned or never installed the repository before, follow these steps in order:
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/vcastald/repo-git.git
+cd repo-git
+```
+
+### 2. Install dependencies
+Install all root and workspace dependencies (`apps/api` and `apps/web`):
 ```bash
 npm install
-cp .env.example .env  # first time only; edit ports if needed
+```
+
+### 3. Configure environment variables
+Copy the template configuration file to `.env`:
+```bash
+cp .env.example .env
+```
+The default configuration works out-of-the-box:
+- `API_PORT=3101` (Fastify backend)
+- `WEB_PORT=5173` (Vite React frontend)
+- `RGB_NODE_PORT=3901` (Docker RGB Lightning Node API)
+- `RGB_PEER_PORT=10091` (LDK peer port)
+- `RGB_PROXY_ENDPOINT=rpcs://proxy.iriswallet.com/0.2/json-rpc`
+
+### 4. Start and initialize the RGB Lightning Node
+Make sure Docker is running, then execute:
+```bash
+npm run node:setup
+```
+What this does automatically:
+1. Launches the Docker container `kaleidoswap/rgb-lightning-node` in the background on port `3901`.
+2. Generates a secure wallet encryption password and seed (saved locally in `.local-node/password` and `.local-node/mnemonic`).
+3. Unlocks the wallet and synchronizes it with the Mutinynet custom Signet network.
+4. Confirms node status: you will see `Ready: signetcustom; node pubkey: <pubkey>`.
+
+> [!IMPORTANT]
+> Keep the `.local-node/` directory safe and private. Do not delete it, as it stores your local wallet database and channel state.
+> You can check node status anytime with `npm run node:status` and stop it with `npm run node:stop`.
+
+### 5. Launch the application
+Start both the backend API and frontend dev server concurrently:
+```bash
 npm run dev
 ```
 
-Open http://127.0.0.1:5173 (or `WEB_PORT` from `.env`). Vite proxies `/api` to Fastify on `API_PORT` from the same root `.env`. The sample endpoint is `GET /api/health`.
+This starts:
+- **Fastify Backend API** on `http://127.0.0.1:3101`
+- **Vite React Frontend** on `http://127.0.0.1:5173`
+
+### 6. Open the Dashboard
+Navigate to [http://127.0.0.1:5173](http://127.0.0.1:5173) in your browser.
+
+You will see:
+- **Node Connected Badge** (green) confirming connection to the local RGB Lightning node.
+- **Left Column:** **Agent Chat** — AI Treasury Assistant for analyzing positions, rebalancing proposals, and insights.
+- **Center Column:** **Transaction Feed** — Live list of incoming/outgoing transfers across on-chain RGB (USDT, XAUT), on-chain BTC, and Lightning payments.
+- **Right Column:** **Asset PieChart & Market Quotes** — Breakdown of confirmed (`Settled`) treasury holdings and live Kaleido market rates.
+- **Top Bar Actions:**
+  - **Deposit Addr:** Copy your on-chain Bitcoin deposit address for Mutinynet faucet funding.
+  - **Target Allocation:** Configure target treasury percentages for BTC, XAUT, and USDT.
+  - **Currency Selector:** Toggle portfolio valuation between `$ USD` and `₿ BTC`.
+  - **Create USDT invoice:** Generate RGB-20 on-chain USDT invoices directly from the UI with custom amounts to claim test-USDT from faucets or counterparty wallets.
+
+---
+
+## Development & Testing Commands
 
 ```bash
-npm run typecheck  # check both workspaces
-npm test           # API and merchant-script tests
-npm run build      # frontend bundle in apps/web/dist
+# Typecheck TypeScript across all workspaces
+npm run typecheck
+
+# Run automated tests (API routes, services, and storage)
+npm test
+
+# Build production bundle for the frontend
+npm run build
+
+# Docker Node management
+npm run node:status   # Check Docker container status
+npm run node:stop     # Stop the node container cleanly
 ```
 
-Tailwind CSS v4 is configured via the Vite plugin and `apps/web/src/style.css`. The frontend and backend run as separate processes; production hosting/proxy configuration is not included.
+---
 
-## BTC Lightning on Mutinynet
+## Advanced: BTC Lightning Setup & Channel Management
 
-Requires Docker Desktop, Node.js 22+, and **Mutinynet test BTC**. This is a local test wallet, not a production payment service. Setup uses KaleidoSDK and the Docker RGB Lightning Node; it does not use the Kaleido CLI.
-
-### 1. Start the wallet (once per machine)
-
-```bash
-npm install
-cp .env.example .env        # first time only
-npm run node:setup          # creates wallet once; later runs unlock the same wallet
-npm run node:status
-```
-
-Back up `.local-node/mnemonic`, `.local-node/password`, and the full `.local-node/data` directory (copy node data while stopped). **The mnemonic alone cannot restore Lightning channel state.** Keep these files private; never expose the local node API or Fastify to the internet. `npm run node:stop` stops the node without deleting it. Do not delete `.local-node/` to troubleshoot.
-
-If starting from an unfunded wallet, run the API with `npm run dev` and get a **Mutinynet on-chain** deposit address:
+If starting from a fresh unfunded wallet, obtain a **Mutinynet on-chain** deposit address via the running API or UI:
 
 ```bash
 curl -X POST http://127.0.0.1:3101/api/wallet/deposit-addresses
