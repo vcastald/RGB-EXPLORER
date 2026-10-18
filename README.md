@@ -106,7 +106,7 @@ curl -X POST 'http://127.0.0.1:3101/api/lightning/invoices/status' -H 'Content-T
 
 Only `{"status":"Succeeded"}` proves receipt. These local endpoints have no authentication; do not expose the API publicly.
 
-The existing failed USDT order is retained in the private journal for refund tracking; `merchant:status` can show it. **Do not repay or retry it.**
+Historical failed USDT orders are retained in private archived journals for refund tracking (see below). `merchant:status` reads only the active merchant journal, not archived history. **Do not repay or retry historical failed orders.**
 
 Ports and node/API URLs can be configured in `.env`. Keep `.env` private. The local Fastify API has no user authentication; do not publish it.
 
@@ -116,7 +116,42 @@ With the API running, `GET /api/lightning/usdt/capacity` reports existing USDT c
 
 These backend endpoints are read-only. **Do not expose this unauthenticated local API publicly.**
 
-For a **separately approved** Mutinynet test-channel purchase, the local terminal has `npm run usdt:setup`: first run reviews the proposed order and requires `CREATE USDT ORDER`; the next run reviews saved final payment terms and requires `PAY USDT <amount>` before broadcasting. `npm run usdt:setup -- --status` only observes the saved order and node USDT channels. By default it uses `https://api.mutinynet2.kaleidoswap.com` and resumes `.local-app/usdt-order-mutinynet2.json` (private, never commit), including the existing successful order. `USDT_LSP_URL` configures the USDT provider independently of BTC; estimates use the same setting. The supported legacy value `https://api.signet.kaleidoswap.com` selects its original `.local-app/usdt-order.json` without overwriting it. Do not delete the journal or lock file after uncertain order/payment submission; reconcile instead of retrying. Miner fee is additional and not independently capped. No order or payment is automatically made by checking capacity/fees. The previous failed USDT orders remain **separate** in `.local-app/merchant-orders.json` and `.local-app/usdt-order.json` and still need refund follow-up. Fastify does not expose order/payment actions; USDT invoices are available through the endpoint below.
+### Open a test-USDT Lightning receiving channel
+
+Prerequisites: run `npm run node:setup` and fund the current wallet with Mutinynet test BTC. The script proposes **20 USDT on the LSP side and zero USDT on your side**, with 50,000 LSP sats and 20,000 client sats. This is inbound receiving capacity, not a purchase of 20 USDT for your wallet. Actual receiving also depends on BTC carrier liquidity.
+
+The script defaults to `https://api.mutinynet2.kaleidoswap.com`. Its provider is configured independently through `USDT_LSP_URL` in your private `.env`; changing `KALEIDO_API_URL` does not change this script's provider:
+
+```dotenv
+USDT_LSP_URL=https://api.mutinynet2.kaleidoswap.com
+```
+
+Run these steps **one at a time** in an interactive terminal:
+
+1. **Create an order:**
+   ```bash
+   npm run usdt:setup
+   ```
+   Review the proposal and fee estimate, then type `CREATE USDT ORDER` to submit. This run does not pay the order.
+2. **Review and pay the saved order:**
+   ```bash
+   npm run usdt:setup
+   ```
+   Review the final payment total and expiry, then type the displayed `PAY USDT <amount>` confirmation if acceptable. The payment includes your 20,000-sat channel allocation and the LSP fee; the miner fee is additional and not independently capped. The script requires a further 2,000-sat balance reserve, which is not a miner-fee cap.
+3. **Check readiness:**
+   ```bash
+   npm run usdt:setup -- --status
+   ```
+   Repeat this status-only command while the channel opens. `COMPLETED` / `PAID` alone is not receiving readiness: require `receiveReady: true`, with the matching node channel ready and usable. Then test a small Lightning invoice using the endpoint below.
+
+**Order history and retry safety:**
+
+- Mutinynet2 uses `.local-app/usdt-order-mutinynet2.json`. The supported legacy provider `https://api.signet.kaleidoswap.com` uses `.local-app/usdt-order.json`. Journals contain private order credentials; never commit or publish them.
+- Existing orders are resumed, not replaced. A journal belonging to another wallet/network/provider is rejected. When deliberately replacing a wallet, archive its journals under `.local-app/archived-orders/<old-node-pubkey>/` before starting a new order; never relabel an old order as belonging to the new wallet.
+- This project's old-wallet merchant and USDT journals were moved to that archive. Historical failed orders still require separate refund follow-up; archiving does not refund them, and normal status commands do not read archived journals.
+- **If order creation or payment times out, stop.** Do not delete the journal or lock file, create a replacement order, or resend payment. Use status and reconcile uncertain submissions with the LSP first. `FAILED` / `TO_REFUND` does not mean a refund has completed.
+
+Fastify does not expose order/payment actions. Capacity checks and fee estimates never create or pay orders. These channel scripts are not needed for on-chain RGB receiving.
 
 ### Create a test-USDT Lightning invoice
 
