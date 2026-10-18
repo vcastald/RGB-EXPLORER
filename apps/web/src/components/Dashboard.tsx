@@ -6,6 +6,7 @@ import { AssetPieChart } from './AssetPieChart'
 import { MarketQuotes } from './MarketQuotes'
 import { TargetAllocation } from './TargetAllocation'
 import { CreateUsdtInvoice } from './CreateUsdtInvoice'
+import { CreateXautInvoice } from './CreateXautInvoice'
 import { useFrame } from '../hooks/useFrame'
 import { LightningIcon } from './Icons'
 import { shortenIdentifier } from '../utils/formatters'
@@ -262,6 +263,9 @@ export function Dashboard({
 
           {/* Create USDT Invoice Button */}
           <CreateUsdtInvoice onInvoiceCreated={onRefreshTransactions} />
+
+          {/* Create XAUT Invoice Button */}
+          <CreateXautInvoice onInvoiceCreated={onRefreshTransactions} />
         </div>
       </div>
 
