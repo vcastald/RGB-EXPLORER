@@ -28,7 +28,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 // Configuration
 // --------------------------------------------------
 
-const MODEL_SELECTED = QWEN3_5_2B_MULTIMODAL_Q4_K_M;
+const MODEL_SELECTED = QWEN3_5_2B_MULTIMODAL_Q4_K_M
 const NODE_URL =
   process.env.RLN_NODE_URL ?? "http://127.0.0.1:3901";
 
@@ -642,7 +642,7 @@ const SWAP_SKILL = `
 name: swap-quote
 description: Retrieve a KaleidoSwap quote without executing a swap.
 tools: kaleidoswap_get_quote, rln_list_assets
-triggers: quote, quotation, exchange rate, convert, estimate, how much would
+triggers: swap, swaps, exchange, trading, quote, quotation, exchange rate, convert, estimate, how much would
 ---
 
 This skill retrieves quotes only. It never executes a swap.
