@@ -153,6 +153,40 @@ Run these steps **one at a time** in an interactive terminal:
 
 Fastify does not expose order/payment actions. Capacity checks and fee estimates never create or pay orders. These channel scripts are not needed for on-chain RGB receiving.
 
+### Optional authenticated USDT channel provisioning API
+
+This endpoint automates order creation **and payment** within an approved order-payment cap. It is disabled by default. Enable only on the trusted local backend by setting `ENABLE_CHANNEL_PROVISIONING=true` and a random `CHANNEL_ADMIN_TOKEN` of at least 32 characters in private `.env`, then restart the API. Never put the token in frontend/Vite configuration or publish it. Node setup and ports are unchanged. `USDT_LSP_URL` selects the same allowlisted providers as the script.
+
+```bash
+curl -sS -X POST http://127.0.0.1:3101/api/lightning/usdt/channels \
+  -H "Authorization: Bearer $CHANNEL_ADMIN_TOKEN" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -H 'Content-Type: application/json' \
+  -d '{"inboundUsdt":"20","clientBalanceSat":20000,"maxOrderPaymentSat":25000,"acceptUncappedMinerFee":true}'
+```
+
+Supply the token securely in your shell too; curl does not load `.env`. Keep the request's idempotency key if you need to repeat that exact request. The example cap is illustrative, not a current quote. The API fixes the LSP BTC allocation at 50,000 sats, channel lifetime at 13,140 blocks, and client USDT allocation at zero. It checks live provider limits before creating the order.
+
+**Spending consent:** this POST authorizes payment of the final order if its total is within `maxOrderPaymentSat`; that total includes the client BTC allocation and LSP charge. Bitcoin miner fees are **additional**, paid at 2 sat/vbyte. The SDK cannot independently cap their absolute total, so `acceptUncappedMinerFee: true` is mandatory. The 2,000-sat balance reserve is not a fee cap. Do not enable/use this API if that policy is unacceptable.
+
+The response is `202 Accepted` with an `operationId` and `Location` header. Poll the authenticated status endpoint:
+
+```bash
+curl -sS "http://127.0.0.1:3101/api/lightning/usdt/channels/OPERATION_ID" \
+  -H "Authorization: Bearer $CHANNEL_ADMIN_TOKEN"
+```
+
+`QUEUED` → `VALIDATING` → `OPENING` → `READY` is the successful flow; order/payment submission states are durably written before sending. Only `READY` / `receiveReady: true` records that the matching channel was verified usable at completion, not that a test payment has settled. Use the capacity endpoint to check subsequent liquidity. Background read-only checks run every 20 seconds while the server is listening. GET returns stored progress and never submits a payment.
+
+Safeguards and limitations:
+
+- The same key and parameters return the same operation; changed parameters with that key return 409. Only one unresolved operation can exist. No submission is automatically retried.
+- `REJECTED` means preflight failed before order submission. `ORDER_UNKNOWN`, `PAYMENT_UNKNOWN`, and `REVIEW_REQUIRED` need manual reconciliation, not another order. A restart never resumes spending; a persisted `OPENING` operation resumes read-only monitoring. There is deliberately no API to clear unresolved spending history.
+- Existing active CLI journals block API provisioning, even if completed, and existing USDT channels block purchasing another. This conservative first version is for initial provisioning, not additional liquidity purchases. **Your existing paid CLI order should continue using CLI status; do not archive it merely to bypass this guard.**
+- The API holds the merchant and both USDT CLI locks through opening or uncertain submission. Do not remove these locks to bypass an unresolved workflow. API operations are not displayed by CLI status commands.
+- The private ledger is `.local-app/usdt-channel-operations.sqlite`. It contains order credentials; back it up securely with the wallet and never publish or delete it to retry a payment. Wallet/network/provider identity is checked. Historical CLI journals remain untouched.
+- Tests use mocked SDK calls. Successful live channel opening and receiving are not guaranteed by unit tests. Other wallet spenders outside these CLI/API workflows are not coordinated by these locks.
+
 ### Create a test-USDT Lightning invoice
 
 `POST /api/lightning/usdt/invoices` accepts a decimal-string `amountUsdt` (up to six decimals, 0.000001–1000) and optional `description` (200 characters).

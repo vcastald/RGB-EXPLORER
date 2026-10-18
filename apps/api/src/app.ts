@@ -1,3 +1,6 @@
+import { KaleidoClient } from 'kaleido-sdk'
+import { UsdtChannels } from './services/usdt-channels.js'
+import { registerUsdtChannelRoutes } from './routes/usdt-channels.js'
 import { createRgbReceivingService, type RgbReceivingReader } from './services/rgb-receiving.js'
 import { registerRgbReceivingRoutes } from './routes/rgb-receiving.js'
 import { createRgbXautInvoiceService, type RgbXautInvoiceCreator } from './services/rgb-xaut-invoices.js'
@@ -52,11 +55,21 @@ export function createApp(options: {
   paramsStore?: ParamsStore
   paramsDbPath?: string
 } = {}) {
-  const app = Fastify({ logger: true })
+  const app = Fastify({ logger: { redact: ['req.headers.authorization'] } })
   const nodeUrl = options.nodeUrl ?? process.env.RGB_NODE_URL ?? `http://${process.env.RGB_NODE_HOST ?? '127.0.0.1'}:${process.env.RGB_NODE_PORT ?? '3901'}`
   const fetchNode = options.fetchNode ?? fetch
   const projectRoot = fileURLToPath(new URL('../../../', import.meta.url))
   const dbPath = resolve(projectRoot, process.env.APP_DB_PATH ?? '.local-app/addresses.sqlite')
+  const provisionToken = process.env.CHANNEL_ADMIN_TOKEN
+  if (process.env.ENABLE_CHANNEL_PROVISIONING === 'true' && provisionToken && provisionToken.length >= 32) {
+    const provider = (process.env.USDT_LSP_URL ?? 'https://api.mutinynet2.kaleidoswap.com').replace(/\/+$/, '')
+    const client = KaleidoClient.create({ nodeUrl, baseUrl: provider, timeout: 30 })
+    const channels = new UsdtChannels(client, resolve(projectRoot, '.local-app'), provider)
+    registerUsdtChannelRoutes(app, channels, provisionToken)
+    app.addHook('onListen', async () => channels.start())
+    app.addHook('onClose', async () => { await channels.close(); await client.close() })
+  } else registerUsdtChannelRoutes(app)
+
   const liveService = options.kaleidoService ? undefined : createKaleidoService(nodeUrl, dbPath)
 
   const liveLightning = options.lightningService ? undefined : createLightningService(nodeUrl)
