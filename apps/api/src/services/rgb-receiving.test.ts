@@ -82,3 +82,38 @@ test('wrong node identity cannot reuse intent; wrong network never refreshes', a
     await assert.rejects(f.service.status('recipient'), /Mutinynet/)
   } finally { await f.service.stop(); f.store.close() }
 })
+
+test('manual refresh forces node call without pending receipts and exposes errors', async () => {
+  const f = fixture()
+  try {
+    f.node.listTransfers = async () => ({ transfers: [] })
+    await f.service.tick()
+    assert.equal(f.refreshes(), 0)
+    assert.equal((await f.service.refreshNow()).refreshed, true)
+    assert.equal(f.refreshes(), 1)
+    f.node.refreshTransfers = async () => { throw Error('offline') }
+    await assert.rejects(f.service.refreshNow(), /unavailable/)
+  } finally { await f.service.stop(); f.store.close() }
+})
+
+test('manual calls coalesce and wait for background refresh without overlapping', async () => {
+  const f = fixture()
+  try {
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    let calls = 0, active = 0, maxActive = 0
+    f.node.refreshTransfers = async () => {
+      calls++; active++; maxActive = Math.max(maxActive, active)
+      if (calls === 1) await gate
+      active--
+    }
+    const background = f.service.tick()
+    await new Promise(resolve => setImmediate(resolve))
+    const a = f.service.refreshNow(), b = f.service.refreshNow()
+    assert.equal(a, b)
+    assert.equal(calls, 1)
+    release(); await background; await a
+    assert.equal(calls, 2)
+    assert.equal(maxActive, 1)
+  } finally { await f.service.stop(); f.store.close() }
+})

@@ -10,6 +10,7 @@ const incoming = (kind: string) => kind === 'ReceiveWitness' || kind === 'Receiv
 export class RgbReceivingService {
   private timer?: ReturnType<typeof setTimeout>
   private running?: Promise<void>
+  private manualRefresh?: Promise<{ refreshed: true; refreshedAt: string }>
   private stopped = true
   private delay = 20000
   private lastRefreshAt: string | null = null
@@ -32,16 +33,28 @@ export class RgbReceivingService {
     return result
   }
 
-  tick(): Promise<void> {
+  tick(force = false): Promise<void> {
     if (this.running) return this.running
-    this.running = this.refresh().finally(() => { this.running = undefined })
+    this.running = this.refresh(force).finally(() => { this.running = undefined })
     return this.running
   }
-  private async refresh() {
+  refreshNow(): Promise<{ refreshed: true; refreshedAt: string }> {
+    if (this.manualRefresh) return this.manualRefresh
+    this.manualRefresh = (async () => {
+      // Wait for an automatic pass, then force a wallet refresh even if no pending
+      // transfers were listed. Concurrent manual callers share this operation.
+      await this.running
+      await this.tick(true)
+      if (this.lastError || !this.lastRefreshAt) throw Error('RGB refresh unavailable')
+      return { refreshed: true as const, refreshedAt: this.lastRefreshAt }
+    })().finally(() => { this.manualRefresh = undefined })
+    return this.manualRefresh
+  }
+  private async refresh(force: boolean) {
     try {
       await this.identity()
-      const { transfers } = await this.node.listTransfers({ asset_filter: allAssets })
-      if (transfers.some(t => incoming(t.kind) && t.status !== 'Settled' && t.status !== 'Failed')) {
+      const transfers = force ? [] : (await this.node.listTransfers({ asset_filter: allAssets })).transfers
+      if (force || transfers.some(t => incoming(t.kind) && t.status !== 'Settled' && t.status !== 'Failed')) {
         // No asset restriction: also retrieves first-receipt consignments for unknown XAUT.
         await this.node.refreshTransfers({ filter: [], skip_sync: false })
         this.lastRefreshAt = new Date().toISOString()
@@ -66,6 +79,7 @@ export class RgbReceivingService {
   async stop() {
     this.stopped = true
     if (this.timer) clearTimeout(this.timer)
+    await this.manualRefresh
     await this.running
   }
 
@@ -96,7 +110,7 @@ export class RgbReceivingService {
       ...(!record ? { warning: 'Invoice predates tracking; original expected asset/amount not recorded. Settlement alone does not verify its payment intent.' } : {}) }
   }
 }
-export type RgbReceivingReader = Pick<RgbReceivingService, 'status'>
+export type RgbReceivingReader = Pick<RgbReceivingService, 'status' | 'refreshNow'>
 export function createRgbReceivingService(nodeUrl: string, dbPath: string, log: (error: unknown) => void) {
   const client = KaleidoClient.create({ nodeUrl, timeout: 10000 })
   const store = new RgbReceiptStore(dbPath)
