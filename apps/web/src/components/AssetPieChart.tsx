@@ -76,6 +76,7 @@ export function AssetPieChart({
       BTC_LN: btcPrice,
     }
 
+	//unsettled transactions are ignored for the pie chart, as they may not reflect the actual asset distribution yet
     const settled = transactions.filter((t) => t.status === 'settled' || !t.status)
 
     const usdtAmount = settled
