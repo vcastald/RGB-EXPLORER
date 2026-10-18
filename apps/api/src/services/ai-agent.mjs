@@ -482,7 +482,7 @@ BALANCES AND ASSETS
 - Retrieve a live quote before stating an estimated swap output.
 - Never ask the user to supply balances that the configured
   tools can retrieve themselves.
-- Never execute the suggested trades.
+- Never execute the suggested trades, tell the user to use 'KALEIDO TOOL' in order to execute the swap
 
 
 REPORTS
