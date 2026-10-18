@@ -28,7 +28,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 // Configuration
 // --------------------------------------------------
 
-const MODEL_SELECTED = QWEN3_5_2B_MULTIMODAL_Q4_K_M;
+const MODEL_SELECTED = QWEN3_5_2B_MULTIMODAL_Q4_K_M
 const NODE_URL =
   process.env.RLN_NODE_URL ?? "http://127.0.0.1:3901";
 
@@ -472,6 +472,18 @@ BALANCES AND ASSETS
   treasury tool can provide them.
 - Do not use fallback UI prices for treasury calculations.
 - Preserve the original units returned by the tools.
+- When the user asks to suggest swaps or rebalance a portfolio,
+  call calculate_rebalance to retrieve actual portfolio values.
+- Use its returned current percentages, target percentages,
+  and differences to identify potential trades.
+- An asset below its target may need to be acquired; an asset
+  above its target may be a source of funds.
+- Treat these as candidate trades, not executable instructions.
+- Retrieve a live quote before stating an estimated swap output.
+- Never ask the user to supply balances that the configured
+  tools can retrieve themselves.
+- Never execute the suggested trades, tell the user to use 'KALEIDO TOOL' in order to execute the swap
+
 
 REPORTS
 - Treat a report request as a request to gather and synthesize
@@ -642,7 +654,7 @@ const SWAP_SKILL = `
 name: swap-quote
 description: Retrieve a KaleidoSwap quote without executing a swap.
 tools: kaleidoswap_get_quote, rln_list_assets
-triggers: quote, quotation, exchange rate, convert, estimate, how much would
+triggers: swap, swaps, exchange, trading, quote, quotation, exchange rate, convert, estimate, how much would
 ---
 
 This skill retrieves quotes only. It never executes a swap.
@@ -690,7 +702,7 @@ const TREASURY_SKILL = `
 name: treasury-allocation
 description: Inspect target allocation and calculate portfolio rebalancing.
 tools: get_target_allocation, calculate_rebalance
-triggers: treasury, rebalance, rebalancing, target allocation, target percentages
+triggers: treasury, rebalance, rebalancing, target allocation, target percentages, suggest swaps, portfolio allocation
 ---
 
 Call get_target_allocation to retrieve the saved percentages.
@@ -871,22 +883,32 @@ rebalance: {
   tools: [
     "get_target_allocation",
     "calculate_rebalance",
+    "kaleidoswap_get_quote",
+    "rln_list_assets",
   ],
   instructions: `
-Inspect the saved treasury allocation or calculate a rebalance.
+The user wants to rebalance their portfolio and may ask for
+suggested swaps.
 
-Use get_target_allocation to read the saved target percentages.
-For a rebalance calculation, call calculate_rebalance without
-supplying current balances or prices.
+1. Call get_target_allocation to retrieve the saved target.
+2. Call calculate_rebalance to retrieve actual balances,
+   live valuations, and current versus target percentages.
+3. Identify assets above and below their target allocations.
+4. Suggest potential swaps that could reduce those differences.
+5. If a quote is needed, inspect available assets and use
+   kaleidoswap_get_quote only with its actual required arguments.
+6. Never invent asset IDs, prices, fees, or output amounts.
+7. If a quote cannot be obtained, provide a clearly labelled
+   indicative suggestion based on calculate_rebalance, without
+   claiming that the swap is executable or quoting an unverified
+   exchange rate.
+8. Never execute a swap or transaction.
 
-The backend retrieves RLN balances, RGB holdings and market quotes.
-Explain the current and target percentages and the differences.
-If a required balance, asset or quote is unavailable, report the
-limitation instead of inventing a value.
-
-This task is read-only. Never execute a swap or transaction.
+The user does not need to provide wallet balances manually.
+The backend retrieves them using calculate_rebalance.
 `,
 },
+
 
 };
 
@@ -928,10 +950,6 @@ function selectTask(question) {
     return TASKS.transactions;
   }
 
-  if (/\b(swap|exchange|trading)\b/.test(q)) {
-    return TASKS.quote;
-  }
-
   if (
     /\b(node|channel|channels|liquidity|capacity|health)\b/.test(q)
   ) {
@@ -944,6 +962,9 @@ function selectTask(question) {
     return TASKS.rebalance;
   }
 
+  if (/\b(swap|exchange|trading)\b/.test(q)) {
+    return TASKS.quote;
+  }
 
   if (
     /\b(balance|balances|portfolio|holdings|wallet|asset|assets|RGB|USDT|XAUT)\b/i.test(q)

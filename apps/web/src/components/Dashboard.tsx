@@ -7,6 +7,7 @@ import { MarketQuotes } from './MarketQuotes'
 import { TargetAllocation } from './TargetAllocation'
 import { CreateUsdtInvoice } from './CreateUsdtInvoice'
 import { CreateXautInvoice } from './CreateXautInvoice'
+import { CreateLightningInvoice } from './CreateLightningInvoice'
 import { useFrame } from '../hooks/useFrame'
 import { LightningIcon } from './Icons'
 import { shortenIdentifier } from '../utils/formatters'
@@ -266,6 +267,9 @@ export function Dashboard({
 
           {/* Create XAUT Invoice Button */}
           <CreateXautInvoice onInvoiceCreated={onRefreshTransactions} />
+
+          {/* Create Lightning Invoice Button */}
+          <CreateLightningInvoice onInvoiceCreated={onRefreshTransactions} />
         </div>
       </div>
 
