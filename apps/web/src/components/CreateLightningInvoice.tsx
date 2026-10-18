@@ -168,11 +168,11 @@ export function CreateLightningInvoice({ onInvoiceCreated }: CreateLightningInvo
                     <span className="text-sm leading-none shrink-0">⚠️</span>
                     <div className="space-y-1">
                       <span className="font-semibold block text-yellow-300">
-                        Canale Lightning Richiesto
+                        Lightning Channel Required
                       </span>
                       <p className="text-[10px] text-yellow-200/90 leading-relaxed">
-                        Assicurati di aver acquistato / aperto un canale Lightning con liquidità inbound.
-                        Se non l&apos;hai ancora fatto, segui le istruzioni dettagliate nel <strong>README.md</strong> (es. <code>npm run usdt:setup</code> o guida LSP).
+                        Make sure you have purchased or opened a Lightning channel with inbound liquidity.
+                        If you haven&apos;t done so yet, follow the instructions in the <strong>README.md</strong> (e.g. <code>npm run usdt:setup</code> or the LSP guide).
                       </p>
                     </div>
                   </div>
@@ -246,7 +246,7 @@ export function CreateLightningInvoice({ onInvoiceCreated }: CreateLightningInvo
                     </div>
                     {error.toLowerCase().includes('liquidity') && (
                       <p className="text-[10px] text-yellow-300/90 border-t border-rose-500/20 pt-1 leading-relaxed">
-                        💡 Non hai abbastanza capacità inbound sul canale. Apri o espandi un canale seguendo il <strong>README.md</strong>.
+                        💡 Not enough inbound liquidity on the channel. Open or expand a channel by following the instructions in <strong>README.md</strong>.
                       </p>
                     )}
                   </div>
