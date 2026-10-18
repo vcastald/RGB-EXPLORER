@@ -181,3 +181,11 @@ curl -sS http://127.0.0.1:3101/api/rgb/usdt/invoices -H 'Content-Type: applicati
 ```
 
 Select **USDT** at the faucet. This invoice accepts **any RGB asset**; the server records the expected USDT contract and only verifies payment against that contract. Do not include `amountUsdt` with bootstrap permission. After receipt and refresh, exact-amount USDT invoices work normally. Without explicit permission, unknown USDT still returns 409 rather than silently relaxing the asset restriction.
+
+To request an immediate on-chain RGB wallet refresh (USDT/XAUT, including unknown-asset receipts):
+
+```sh
+curl -sS -X POST http://127.0.0.1:3101/api/rgb/transfers/refresh
+```
+
+Returns `refreshed: true` and `refreshedAt` after the node call completes, or HTTP 503 on failure/uncertain completion. This shares the background refresh lock and coalesces concurrent manual requests. A successful refresh **does not mean an invoice is paid**; check its transfer status separately. Refresh processes wallet transfers and acknowledgements; it is not a read-only operation or a Lightning-payment retry. Keep this unauthenticated endpoint local.

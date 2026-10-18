@@ -1,5 +1,14 @@
 import type { FastifyInstance } from 'fastify'
 export function registerRgbReceivingRoutes(app: FastifyInstance) {
+  app.post('/api/rgb/transfers/refresh', async (_request, reply) => {
+    try {
+      return await app.rgbReceivingService.refreshNow()
+    } catch (error) {
+      app.log.warn({ error }, 'Manual RGB refresh unavailable')
+      return reply.code(503).send({ error: 'RGB refresh failed or completion uncertain; payment not verified' })
+    }
+  })
+
   app.get<{ Querystring: { recipientId: string } }>('/api/rgb/transfers/status', {
     schema: { querystring: { type: 'object', required: ['recipientId'], additionalProperties: false,
       properties: { recipientId: { type: 'string', minLength: 1, maxLength: 1024 } } } },
