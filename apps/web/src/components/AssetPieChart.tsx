@@ -76,22 +76,28 @@ export function AssetPieChart({
       BTC_LN: btcPrice,
     }
 
-    const settled = transactions.filter((t) => t.status === 'settled' || !t.status)
+    // Only settled transactions for USDT and XAUT
+    const usdtTxs = transactions.filter((t) => t.asset === 'USDT' && t.status === 'settled')
+    const usdtAmount = Math.max(
+      0,
+      usdtTxs.reduce((sum, t) => sum + (t.direction === 'outgoing' ? -t.amount : t.amount), 0)
+    )
 
-    const usdtAmount = settled
-      .filter((t) => t.asset === 'USDT')
-      .reduce((sum, t) => sum + t.amount, 0)
-    const xautAmount = settled
-      .filter((t) => t.asset === 'XAUT')
-      .reduce((sum, t) => sum + t.amount, 0)
+    const xautTxs = transactions.filter((t) => t.asset === 'XAUT' && t.status === 'settled')
+    const xautAmount = Math.max(
+      0,
+      xautTxs.reduce((sum, t) => sum + (t.direction === 'outgoing' ? -t.amount : t.amount), 0)
+    )
 
-    // Calculate on-chain BTC (excluding lightning payments)
+    // Calculate confirmed on-chain BTC (strictly settled and confirmed in a block, excluding unconfirmed/mempool txs)
     const onchainBtcTxs = transactions.filter(
       (t) =>
         (t.asset === 'BTC' || t.asset === 'BTC_LN') &&
         t.paymentType !== 'lightning' &&
         !t.paymentHash &&
-        (t.status === 'settled' || !t.status)
+        t.status === 'settled' &&
+        t.blockHeight != null &&
+        t.blockHeight > 0
     )
     const btcOnChainAmount = Math.max(
       0,
@@ -103,7 +109,7 @@ export function AssetPieChart({
       (t) =>
         (t.asset === 'BTC' || t.asset === 'BTC_LN') &&
         (t.paymentType === 'lightning' || Boolean(t.paymentHash)) &&
-        (t.status === 'settled' || !t.status)
+        t.status === 'settled'
     )
     const btcLightningAmount = Math.max(
       0,
@@ -132,7 +138,7 @@ export function AssetPieChart({
       {
         asset: 'USDT' as AssetType,
         name: 'Tether USD',
-        protocol: 'RGB20 (LN)',
+        protocol: 'RGB20 (On-Chain)',
         amount: usdtAmount,
         convertedValue: denomination === 'USD' ? usdtUsd : usdtUsd / rates.BTC,
         percent: (usdtUsd / totalUsd) * 100,
@@ -143,7 +149,7 @@ export function AssetPieChart({
       {
         asset: 'XAUT' as AssetType,
         name: 'Tether Gold',
-        protocol: 'RGB20 (LN)',
+        protocol: 'RGB20 (On-Chain)',
         amount: xautAmount,
         convertedValue: denomination === 'USD' ? xautUsd : xautUsd / rates.BTC,
         percent: (xautUsd / totalUsd) * 100,
@@ -216,7 +222,7 @@ export function AssetPieChart({
           </span>
         </div>
         <p className="mt-0.5 text-xs text-slate-400">
-          Treasury breakdown across RGB Lightning channels and on-chain Bitcoin node
+          Treasury breakdown across on-chain RGB tokens, on-chain Bitcoin, and Lightning channels
         </p>
       </div>
 

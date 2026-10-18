@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Header } from './components/Header'
 import { Dashboard } from './components/Dashboard'
-import sampleTransactionsData from './data/transactions.json'
-import { Transaction, Denomination, ChannelLiquidity } from './types/transaction'
+import { Transaction, Denomination, ChannelLiquidity, AssetType } from './types/transaction'
 import { useNodeStatus } from './hooks/useNodeStatus'
-
-const defaultNonBtcTransactions = (sampleTransactionsData as Transaction[]).filter(
-  (tx) => tx.asset !== 'BTC'
-)
 
 export default function App() {
   const [apiStatus, setApiStatus] = useState<string>('Checking…')
@@ -77,18 +72,20 @@ export default function App() {
     }
   }, [])
 
-  // Fetch real on-chain BTC transactions and Lightning payments from Kaleido node
+  // Fetch real on-chain BTC transactions, Lightning payments, and on-chain RGB transfers (USDT, XAUT) from Kaleido node
   const fetchTransactions = useCallback(async (signal?: AbortSignal) => {
     try {
       setTransactionsLoading(true)
 
-      const [txResponse, payResponse] = await Promise.all([
+      const [txResponse, payResponse, transferResponse] = await Promise.all([
         fetch('/api/wallet/transactions', { signal }).catch(() => null),
         fetch('/api/wallet/payments', { signal }).catch(() => null),
+        fetch('/api/wallet/transfers', { signal }).catch(() => null),
       ])
 
       let realBtcTransactions: Transaction[] = []
       let realLightningPayments: Transaction[] = []
+      let realRgbTransfers: Transaction[] = []
 
       if (txResponse && txResponse.ok) {
         const data = (await txResponse.json()) as {
@@ -179,10 +176,53 @@ export default function App() {
         }
       }
 
+      if (transferResponse && transferResponse.ok) {
+        const data = (await transferResponse.json()) as {
+          transfers?: Array<{
+            id: string
+            txid?: string | null
+            timestamp: string
+            asset: 'USDT' | 'XAUT' | 'BTC' | string
+            amount: number
+            unit: string
+            direction?: 'incoming' | 'outgoing'
+            status: 'settled' | 'pending' | 'failed'
+            sender?: {
+              name: string
+              identifier: string
+              type?: 'node' | 'business' | 'individual' | 'exchange'
+            }
+            memo?: string
+            recipientId?: string | null
+            receiveUtxo?: string | null
+          }>
+        }
+
+        if (data && Array.isArray(data.transfers)) {
+          realRgbTransfers = data.transfers.map((t) => ({
+            id: t.id,
+            txid: t.txid ?? undefined,
+            timestamp: t.timestamp,
+            asset: (t.asset === 'XAUT' ? 'XAUT' : 'USDT') as AssetType,
+            amount: t.amount,
+            unit: t.unit || t.asset,
+            direction: t.direction,
+            status: t.status,
+            paymentType: 'onchain' as const,
+            sender: t.sender || {
+              name: t.direction === 'outgoing' ? 'RGB On-Chain Transfer' : 'RGB On-Chain Deposit',
+              identifier: t.txid || t.recipientId || t.id,
+              type: 'node',
+            },
+            memo: t.memo || `On-chain RGB ${t.asset} transfer`,
+          }))
+        }
+      }
+
       const merged = [
         ...realBtcTransactions,
         ...realLightningPayments,
-        ...defaultNonBtcTransactions,
+        ...realRgbTransfers,
       ].sort(
         (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       )
@@ -190,7 +230,7 @@ export default function App() {
       setTransactions(merged)
     } catch (error) {
       if (!(error instanceof Error && error.name === 'AbortError')) {
-        setTransactions((prev) => (prev.length > 0 ? prev : defaultNonBtcTransactions))
+        setTransactions((prev) => prev)
       }
     } finally {
       setTransactionsLoading(false)
@@ -254,6 +294,7 @@ export default function App() {
           denomination={denomination}
           onDenominationChange={setDenomination}
           channelLiquidity={channelLiquidity}
+          onRefreshTransactions={fetchTransactions}
         />
       </main>
 

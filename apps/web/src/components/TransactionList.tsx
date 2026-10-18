@@ -45,7 +45,7 @@ export function TransactionList({
         (tx.memo && tx.memo.toLowerCase().includes(query)) ||
         tx.asset.toLowerCase().includes(query) ||
         (isLightning && 'lightning'.includes(query)) ||
-        (!isLightning && tx.asset === 'BTC' && 'onchain'.includes(query))
+        (!isLightning && 'onchain'.includes(query))
 
       return matchAsset && matchQuery
     })

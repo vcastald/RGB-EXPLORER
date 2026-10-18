@@ -176,3 +176,95 @@ test('listPayments maps node payments and channel liquidity', async () => {
   assert.equal(res.channelLiquidity.capacityBtc, 0.0005)
   assert.equal(res.channelLiquidity.localBalanceBtc, 0.000031)
 })
+
+test('listTransfers maps on-chain RGB transfers with asset metadata and precision', async () => {
+  const node = {
+    listAssets: async () => ({
+      nia: [
+        {
+          asset_id: 'rgb:usdt-contract-id',
+          ticker: 'USDT',
+          name: 'Tether USD',
+          precision: 2,
+          issued_supply: 1000000,
+          timestamp: 1770000000,
+          added_at: 1770000000,
+          balance: { settled: 50000, future: 50000, spendable: 50000, offchain_outbound: 0, offchain_inbound: 0 },
+        },
+        {
+          asset_id: 'rgb:xaut-contract-id',
+          ticker: 'XAUT',
+          name: 'Tether Gold',
+          precision: 4,
+          issued_supply: 50000,
+          timestamp: 1770000000,
+          added_at: 1770000000,
+          balance: { settled: 12500, future: 12500, spendable: 12500, offchain_outbound: 0, offchain_inbound: 0 },
+        },
+      ],
+      uda: [],
+      cfa: [],
+      ifa: [],
+    }),
+    listTransfers: async (body?: any) => {
+      if (body?.asset_filter?.value === 'rgb:usdt-contract-id') {
+        return {
+          transfers: [
+            {
+              idx: 1,
+              created_at: 1770000100,
+              updated_at: 1770000200,
+              status: 'Settled' as any,
+              kind: 'ReceiveBlind' as any,
+              txid: 'tx-usdt-1234',
+              recipient_id: 'blinded-utxo-1',
+              assignments: [{ type: 'Fungible' as any, value: 50000 }],
+              transport_endpoints: [],
+            },
+          ],
+        }
+      }
+      if (body?.asset_filter?.value === 'rgb:xaut-contract-id') {
+        return {
+          transfers: [
+            {
+              idx: 2,
+              created_at: 1770000300,
+              updated_at: 1770000400,
+              status: 'Settled' as any,
+              kind: 'ReceiveWitness' as any,
+              txid: 'tx-xaut-5678',
+              recipient_id: 'witness-utxo-2',
+              assignments: [{ type: 'Fungible' as any, value: 12500 }],
+              transport_endpoints: [],
+            },
+          ],
+        }
+      }
+      return { transfers: [] }
+    },
+  } as unknown as NodeReader
+
+  const service = new KaleidoService(node, new SqliteAddressStore(':memory:'), () => new Date('2026-10-17T12:00:00Z'))
+  const res = await service.listTransfers()
+
+  assert.equal(res.transfers.length, 2)
+
+  const usdtTx = res.transfers.find((t) => t.asset === 'USDT')
+  assert.ok(usdtTx)
+  assert.equal(usdtTx.amount, 500.0) // 50000 / 10^2
+  assert.equal(usdtTx.unit, 'USDT')
+  assert.equal(usdtTx.direction, 'incoming')
+  assert.equal(usdtTx.status, 'settled')
+  assert.equal(usdtTx.paymentType, 'onchain')
+  assert.equal(usdtTx.txid, 'tx-usdt-1234')
+
+  const xautTx = res.transfers.find((t) => t.asset === 'XAUT')
+  assert.ok(xautTx)
+  assert.equal(xautTx.amount, 1.25) // 12500 / 10^4
+  assert.equal(xautTx.unit, 'XAUT')
+  assert.equal(xautTx.direction, 'incoming')
+  assert.equal(xautTx.status, 'settled')
+  assert.equal(xautTx.paymentType, 'onchain')
+  assert.equal(xautTx.txid, 'tx-xaut-5678')
+})

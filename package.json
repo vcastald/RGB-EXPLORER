@@ -15,7 +15,8 @@
     "merchant:plan": "node scripts/merchant-plan.mjs",
     "merchant:setup": "node scripts/merchant-setup.mjs setup",
     "merchant:status": "node scripts/merchant-setup.mjs status",
-    "merchant:pay": "node scripts/merchant-setup.mjs pay"
+    "merchant:pay": "node scripts/merchant-setup.mjs pay",
+    "usdt:setup": "node scripts/usdt-setup.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
