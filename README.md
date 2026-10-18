@@ -64,6 +64,7 @@ The default configuration works out-of-the-box:
 - `RGB_NODE_PORT=3901` (Docker RGB Lightning Node API)
 - `RGB_PEER_PORT=10091` (LDK peer port)
 - `RGB_PROXY_ENDPOINT=rpcs://proxy.iriswallet.com/0.2/json-rpc`
+- `KALEIDO_API_URL=https://api.mutinynet2.kaleidoswap.com`
 
 ### 4. Start and initialize the RGB Lightning Node
 Make sure Docker is running, then execute:
