@@ -28,7 +28,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 // Configuration
 // --------------------------------------------------
 
-const MODEL_SELECTED = QWEN3_5_0_8B_MULTIMODAL_Q4_K_M
+const MODEL_SELECTED = QWEN3_5_2B_MULTIMODAL_Q4_K_M;
 const NODE_URL =
   process.env.RLN_NODE_URL ?? "http://127.0.0.1:3901";
 
