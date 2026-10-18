@@ -1,12 +1,26 @@
 import type { FastifyInstance } from 'fastify'
 export function registerRgbReceivingRoutes(app: FastifyInstance) {
-  app.post('/api/rgb/transfers/refresh', async (_request, reply) => {
-    try {
-      return await app.rgbReceivingService.refreshNow()
-    } catch (error) {
-      app.log.warn({ error }, 'Manual RGB refresh unavailable')
-      return reply.code(503).send({ error: 'RGB refresh failed or completion uncertain; payment not verified' })
-    }
+  app.register(async (sub) => {
+    sub.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body: string, done) => {
+      if (!body || body.trim() === '') {
+        done(null, {})
+        return
+      }
+      try {
+        done(null, JSON.parse(body))
+      } catch (err) {
+        done(err as Error)
+      }
+    })
+
+    sub.post('/api/rgb/transfers/refresh', async (_request, reply) => {
+      try {
+        return await sub.rgbReceivingService.refreshNow()
+      } catch (error) {
+        sub.log.warn({ error }, 'Manual RGB refresh unavailable')
+        return reply.code(503).send({ error: 'RGB refresh failed or completion uncertain; payment not verified' })
+      }
+    })
   })
 
   app.get<{ Querystring: { recipientId: string } }>('/api/rgb/transfers/status', {
