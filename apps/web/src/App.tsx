@@ -294,6 +294,7 @@ export default function App() {
           denomination={denomination}
           onDenominationChange={setDenomination}
           channelLiquidity={channelLiquidity}
+          onRefreshTransactions={fetchTransactions}
         />
       </main>
 

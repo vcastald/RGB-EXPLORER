@@ -76,23 +76,28 @@ export function AssetPieChart({
       BTC_LN: btcPrice,
     }
 
-	//unsettled transactions are ignored for the pie chart, as they may not reflect the actual asset distribution yet
-    const settled = transactions.filter((t) => t.status === 'settled' || !t.status)
+    // Only settled transactions for USDT and XAUT
+    const usdtTxs = transactions.filter((t) => t.asset === 'USDT' && t.status === 'settled')
+    const usdtAmount = Math.max(
+      0,
+      usdtTxs.reduce((sum, t) => sum + (t.direction === 'outgoing' ? -t.amount : t.amount), 0)
+    )
 
-    const usdtAmount = settled
-      .filter((t) => t.asset === 'USDT')
-      .reduce((sum, t) => sum + t.amount, 0)
-    const xautAmount = settled
-      .filter((t) => t.asset === 'XAUT')
-      .reduce((sum, t) => sum + t.amount, 0)
+    const xautTxs = transactions.filter((t) => t.asset === 'XAUT' && t.status === 'settled')
+    const xautAmount = Math.max(
+      0,
+      xautTxs.reduce((sum, t) => sum + (t.direction === 'outgoing' ? -t.amount : t.amount), 0)
+    )
 
-    // Calculate on-chain BTC (excluding lightning payments)
+    // Calculate confirmed on-chain BTC (strictly settled and confirmed in a block, excluding unconfirmed/mempool txs)
     const onchainBtcTxs = transactions.filter(
       (t) =>
         (t.asset === 'BTC' || t.asset === 'BTC_LN') &&
         t.paymentType !== 'lightning' &&
         !t.paymentHash &&
-        (t.status === 'settled' || !t.status)
+        t.status === 'settled' &&
+        t.blockHeight != null &&
+        t.blockHeight > 0
     )
     const btcOnChainAmount = Math.max(
       0,
@@ -104,7 +109,7 @@ export function AssetPieChart({
       (t) =>
         (t.asset === 'BTC' || t.asset === 'BTC_LN') &&
         (t.paymentType === 'lightning' || Boolean(t.paymentHash)) &&
-        (t.status === 'settled' || !t.status)
+        t.status === 'settled'
     )
     const btcLightningAmount = Math.max(
       0,

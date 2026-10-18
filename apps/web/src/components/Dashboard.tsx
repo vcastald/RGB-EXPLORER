@@ -5,6 +5,7 @@ import { TransactionList } from './TransactionList'
 import { AssetPieChart } from './AssetPieChart'
 import { MarketQuotes } from './MarketQuotes'
 import { TargetAllocation } from './TargetAllocation'
+import { CreateUsdtInvoice } from './CreateUsdtInvoice'
 import { useFrame } from '../hooks/useFrame'
 import { LightningIcon } from './Icons'
 import { shortenIdentifier } from '../utils/formatters'
@@ -17,6 +18,7 @@ interface DashboardProps {
   denomination: Denomination
   onDenominationChange: (val: Denomination) => void
   channelLiquidity?: ChannelLiquidity | null
+  onRefreshTransactions?: () => void
 }
 
 export function Dashboard({
@@ -27,6 +29,7 @@ export function Dashboard({
   denomination,
   onDenominationChange,
   channelLiquidity,
+  onRefreshTransactions,
 }: DashboardProps) {
   const [selectedAsset, setSelectedAsset] = useState<'ALL' | AssetType>('ALL')
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -256,21 +259,24 @@ export function Dashboard({
               </>
             )}
           </div>
+
+          {/* Create USDT Invoice Button */}
+          <CreateUsdtInvoice onInvoiceCreated={onRefreshTransactions} />
         </div>
       </div>
 
       {/* Central Section: 3 equal-height columns on desktop:
-          Col 1: Agent Chat
-          Col 2: Scrollable Transaction List
-          Col 3: Asset Pie Chart + Kaleido Market Quotes
+          Col 1: Agent Chat (Left)
+          Col 2: Scrollable Transaction List (Center)
+          Col 3: Asset Pie Chart + Kaleido Market Quotes (Right)
       */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3 xl:gap-6 items-stretch">
-        {/* Column 1: Agent Chat */}
+        {/* Column 1: Agent Chat (Left) */}
         <div className="h-[600px] lg:h-[740px]">
           <AgentChat />
         </div>
 
-        {/* Column 2: Transaction List */}
+        {/* Column 2: Transaction List (Center) */}
         <div className="h-[600px] lg:h-[740px]">
           <TransactionList
             transactions={transactions}
@@ -280,7 +286,7 @@ export function Dashboard({
           />
         </div>
 
-        {/* Column 3: Pie Chart + Market Quotes */}
+        {/* Column 3: Pie Chart + Market Quotes (Right) */}
         <div className="flex h-auto flex-col gap-4 lg:h-[740px]">
           <div className="min-h-[380px] lg:min-h-0 lg:flex-[1.25]">
             <AssetPieChart
