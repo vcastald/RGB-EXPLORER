@@ -3,6 +3,7 @@ import { Header } from './components/Header'
 import { Dashboard } from './components/Dashboard'
 import { Transaction, Denomination, ChannelLiquidity, AssetType } from './types/transaction'
 import { useNodeStatus } from './hooks/useNodeStatus'
+import { useRgbTransfersRefresh } from './hooks/useRgbTransfersRefresh'
 
 export default function App() {
   const [apiStatus, setApiStatus] = useState<string>('Checking…')
@@ -237,6 +238,9 @@ export default function App() {
     }
   }, [])
 
+  // Periodically refresh RGB on-chain transfers from node/proxy every 30s
+  const { refresh: refreshRgbTransfers } = useRgbTransfersRefresh(30000, fetchTransactions)
+
   useEffect(() => {
     const controller = new AbortController()
     fetchDepositAddress(controller.signal)
@@ -255,9 +259,10 @@ export default function App() {
   const handleRefresh = useCallback(() => {
     setTransactionsLoading(true)
     refreshNode()
+    refreshRgbTransfers()
     fetchDepositAddress()
     fetchTransactions()
-  }, [refreshNode, fetchDepositAddress, fetchTransactions])
+  }, [refreshNode, refreshRgbTransfers, fetchDepositAddress, fetchTransactions])
 
   useEffect(() => {
     const controller = new AbortController()
