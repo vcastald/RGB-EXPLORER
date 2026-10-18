@@ -690,7 +690,7 @@ const TREASURY_SKILL = `
 name: treasury-allocation
 description: Inspect target allocation and calculate portfolio rebalancing.
 tools: get_target_allocation, calculate_rebalance
-triggers: treasury, rebalance, rebalancing, target allocation, target percentages
+triggers: treasury, rebalance, rebalancing, target allocation, target percentages, suggest swaps, portfolio allocation
 ---
 
 Call get_target_allocation to retrieve the saved percentages.
@@ -928,10 +928,6 @@ function selectTask(question) {
     return TASKS.transactions;
   }
 
-  if (/\b(swap|exchange|trading)\b/.test(q)) {
-    return TASKS.quote;
-  }
-
   if (
     /\b(node|channel|channels|liquidity|capacity|health)\b/.test(q)
   ) {
@@ -944,6 +940,9 @@ function selectTask(question) {
     return TASKS.rebalance;
   }
 
+  if (/\b(swap|exchange|trading)\b/.test(q)) {
+    return TASKS.quote;
+  }
 
   if (
     /\b(balance|balances|portfolio|holdings|wallet|asset|assets|RGB|USDT|XAUT)\b/i.test(q)
