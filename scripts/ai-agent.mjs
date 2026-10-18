@@ -1,4 +1,3 @@
-
 import process from "node:process";
 
 import {
@@ -36,6 +35,10 @@ const ALLOWED_TOOLS = [
   "rln_list_swaps",
   "kaleidoswap_get_quote",
 ];
+
+// Questions matching this pattern are answered by generateReport()
+// directly, without going through the small LLM.
+const REPORT_INTENT = /\b(report|full report|status report|summary report)\b/i;
 
 const SYSTEM_PROMPT = `
 You are RGB Explorer, an AI assistant specialized in Bitcoin,
@@ -211,6 +214,7 @@ let mcpConnected = false;
 let qvacLoaded = false;
 
 let kaleido;
+let tools;
 let engine;
 
 let initializationPromise;
@@ -265,7 +269,7 @@ async function initializeAgentInternal() {
   await kaleido.connect();
   mcpConnected = true;
 
-  const tools = new ToolRegistry([kaleido]);
+  tools = new ToolRegistry([kaleido]);
 
   console.log("Available read-only tools:", ALLOWED_TOOLS);
 
@@ -327,8 +331,242 @@ export function initializeAgent() {
   return initializationPromise;
 }
 
+// ---------------------------------------------------------------
+// Report: deterministic data collection and rendering.
+// The LLM never touches the numbers.
+// ---------------------------------------------------------------
+
+// MCP tools usually return { content: [{ type: "text", text: "<json>" }] }.
+function unwrapToolResult(res) {
+  if (res && typeof res === "object" && res.isError) {
+    const message = Array.isArray(res.content)
+      ? res.content.map((c) => c?.text ?? "").join(" ")
+      : "tool error";
+    throw new Error(message || "tool error");
+  }
+
+  const text = Array.isArray(res?.content)
+    ? res.content
+        .filter((c) => c?.type === "text")
+        .map((c) => c.text)
+        .join("\n")
+    : typeof res === "string"
+      ? res
+      : undefined;
+
+  if (text !== undefined) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
+  }
+
+  return res;
+}
+
+// Runs a tool on the already connected MCP source (no second process).
+// The executing method name depends on @kaleidorg/mind: if none of the
+// candidates exists, the real method names are logged to stderr.
+async function callTool(name, args = {}) {
+  await initializeAgent();
+
+  const target = [tools, kaleido].find(Boolean);
+  const method = ["callTool", "execute", "call", "run"].find(
+    (m) => typeof target?.[m] === "function",
+  );
+
+  if (!method) {
+    console.error(
+      "DEBUG ToolRegistry methods:",
+      Object.getOwnPropertyNames(Object.getPrototypeOf(tools ?? {})),
+    );
+    console.error(
+      "DEBUG McpToolSource methods:",
+      Object.getOwnPropertyNames(Object.getPrototypeOf(kaleido ?? {})),
+    );
+    throw new Error("No tool execution method found on the MCP source.");
+  }
+
+  return unwrapToolResult(await target[method](name, args));
+}
+
+async function safeCall(name, args) {
+  try {
+    return { ok: true, data: await callTool(name, args) };
+  } catch (error) {
+    return { ok: false, error: String(error?.message ?? error) };
+  }
+}
+
+function toList(data, ...keys) {
+  if (Array.isArray(data)) return data;
+
+  for (const key of keys) {
+    if (Array.isArray(data?.[key])) return data[key];
+  }
+
+  return [];
+}
+
+function countBy(list, ...fields) {
+  const counts = {};
+
+  for (const item of list) {
+    const field = fields.find((f) => item?.[f] !== undefined);
+    const key = String(field ? item[field] : "unknown");
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+
+  return counts;
+}
+
+function formatCounts(counts) {
+  const entries = Object.entries(counts);
+
+  return entries.length
+    ? entries.map(([key, value]) => `${key}: ${value}`).join(", ")
+    : "none";
+}
+
+function jsonBlock(data) {
+  return "```json\n" + JSON.stringify(data, null, 2) + "\n```";
+}
+
+function renderSection(title, result, render) {
+  if (!result.ok) {
+    return `## ${title}\nUnavailable (tool error): ${result.error}\n`;
+  }
+
+  return `## ${title}\n${render(result.data)}\n`;
+}
+
+function renderHistorySection(title, result, listKeys) {
+  return renderSection(title, result, (data) => {
+    const list = toList(data, ...listKeys, "items", "data");
+
+    return (
+      `Records returned: ${list.length}\n` +
+      `By status: ${formatCounts(countBy(list, "status", "state"))}`
+    );
+  });
+}
+
+export async function generateReport({ withNote = false } = {}) {
+  const [info, balances, assets, channels, payments, transfers, swaps] =
+    await Promise.all([
+      safeCall("rln_get_node_info"),
+      safeCall("rln_get_balances"),
+      safeCall("rln_list_assets"),
+      safeCall("rln_list_channels"),
+      safeCall("rln_list_payments"),
+      safeCall("rln_list_transfers"),
+      safeCall("rln_list_swaps"),
+    ]);
+
+  const sections = [
+    renderSection("Node", info, jsonBlock),
+
+    // No totals: fields are shown separately until the schema is verified.
+    renderSection(
+      "Balances",
+      balances,
+      (data) =>
+        `Fields reported separately (no total computed):\n${jsonBlock(data)}`,
+    ),
+
+    renderSection("RGB assets", assets, (data) => {
+      const list = toList(data, "assets", "items", "data");
+      return `Assets returned: ${list.length}`;
+    }),
+
+    renderSection("Channels", channels, (data) => {
+      const list = toList(data, "channels", "items", "data");
+
+      return (
+        `Channels returned: ${list.length}\n` +
+        `By status: ${formatCounts(countBy(list, "status", "state"))}`
+      );
+    }),
+
+    renderHistorySection("Lightning payments", payments, ["payments"]),
+    renderHistorySection("RGB transfers", transfers, ["transfers"]),
+    renderHistorySection("Swaps", swaps, ["swaps"]),
+  ];
+
+  let report =
+    `# RGB Explorer Report\n` +
+    `Generated: ${new Date().toISOString()}\n` +
+    `Network: ${NETWORK}\n\n` +
+    sections.join("\n") +
+    "\nNote: record counts reflect what each query returned. They do not " +
+    "prove completion or a complete history.\n";
+
+  // Optional LLM note: only about which sections failed, never about numbers.
+  if (withNote && engine) {
+    try {
+      const status = {
+        node: info.ok,
+        balances: balances.ok,
+        assets: assets.ok,
+        channels: channels.ok,
+        payments: payments.ok,
+        transfers: transfers.ok,
+        swaps: swaps.ok,
+      };
+
+      const result = await engine.runAgentic(
+        [
+          {
+            role: "system",
+            content:
+              "Write one or two short sentences. Never invent numbers.",
+          },
+          {
+            role: "user",
+            content:
+              "Which report sections failed? Status (true = ok): " +
+              JSON.stringify(status),
+          },
+        ],
+        { allowedTools: [] },
+      );
+
+      const note = result?.text?.trim();
+      if (note) report += `\n## Note\n${note}\n`;
+    } catch {
+      // The report stays valid without the note.
+    }
+  }
+
+  return report;
+}
+
+// ---------------------------------------------------------------
+
 async function askInternal(question, conversationId) {
   await initializeAgent();
+
+  const history = conversations.get(conversationId) ?? [];
+
+  // Report requests bypass the LLM entirely.
+  if (REPORT_INTENT.test(question)) {
+    const report = await generateReport();
+
+    const updatedHistory = [
+      ...history,
+      { role: "user", content: question },
+      // Keep the history compact: the full report would eat context.
+      {
+        role: "assistant",
+        content: `[Report generated at ${new Date().toISOString()}]`,
+      },
+    ].slice(-MAX_HISTORY_MESSAGES);
+
+    conversations.set(conversationId, updatedHistory);
+
+    return report;
+  }
 
   const skills = buildSkills();
 
@@ -337,8 +575,6 @@ async function askInternal(question, conversationId) {
     question,
     SYSTEM_PROMPT,
   );
-
-  const history = conversations.get(conversationId) ?? [];
 
   const messages = [
     {
@@ -422,6 +658,7 @@ async function closeResources() {
   }
 
   engine = undefined;
+  tools = undefined;
 
   try {
     await closeQvac();
