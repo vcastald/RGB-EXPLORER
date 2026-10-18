@@ -34,9 +34,6 @@ export function useRgbTransfersRefresh(
     try {
       const res = await fetch('/api/rgb/transfers/refresh', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         signal: AbortSignal.timeout(20000),
       })
 

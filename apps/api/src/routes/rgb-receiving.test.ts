@@ -30,7 +30,18 @@ test('manual refresh returns completion or 503, never payment success', async ()
       assert.equal(response.statusCode, fail ? 503 : 200)
       assert.equal(calls, 1)
       assert.equal(response.json().paid, undefined)
-      if (!fail) assert.equal(response.json().refreshed, true)
+      if (!fail) {
+        assert.equal(response.json().refreshed, true)
+        // Also assert that sending Content-Type: application/json with empty body succeeds
+        const withEmptyJson = await app.inject({
+          method: 'POST',
+          url: '/api/rgb/transfers/refresh',
+          headers: { 'content-type': 'application/json' },
+          body: '',
+        })
+        assert.equal(withEmptyJson.statusCode, 200)
+        assert.equal(withEmptyJson.json().refreshed, true)
+      }
     } finally { await app.close() }
   }
 })

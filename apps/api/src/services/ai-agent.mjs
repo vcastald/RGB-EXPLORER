@@ -8,6 +8,7 @@ import {
   unloadModel,
   close as closeQvac,
   QWEN3_5_2B_MULTIMODAL_Q4_K_M,
+  QWEN3_5_0_8B_MULTIMODAL_Q4_K_M,
 } from "@qvac/sdk";
 
 import {
@@ -27,6 +28,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 // Configuration
 // --------------------------------------------------
 
+const MODEL_SELECTED = QWEN3_5_2B_MULTIMODAL_Q4_K_M;
 const NODE_URL =
   process.env.RLN_NODE_URL ?? "http://127.0.0.1:3901";
 
@@ -471,6 +473,19 @@ BALANCES AND ASSETS
 - Do not use fallback UI prices for treasury calculations.
 - Preserve the original units returned by the tools.
 
+REPORTS
+- Treat a report request as a request to gather and synthesize
+  live information, not as a request to print raw JSON.
+- Select tools according to the scope requested by the user.
+- For a general status report, inspect all relevant status,
+  balance, asset, channel, payment, transfer and swap sources.
+- For a narrower report, retrieve only the relevant information.
+- Continue gathering available information if one tool fails.
+- Summarize results in clear Markdown, with explicit failures
+  and limitations.
+- Do not invent missing information or treat failed queries
+  as empty histories.
+
 TRANSFERS AND PAYMENTS
 - Use rln_list_transfers for transfer records.
 - Use rln_list_payments for payment records.
@@ -683,6 +698,46 @@ Never guess or modify the saved allocation.
 Distinguish target percentages from actual wallet balances.
 `;
 
+
+const REPORT_SKILL = `
+---
+name: status-report
+description: Generate a user-requested RGB Explorer status report.
+tools: rln_get_node_info, rln_get_balances, rln_list_assets, rln_list_channels, rln_list_payments, rln_list_transfers, rln_list_swaps
+triggers: report, full report, status report, summary report
+---
+
+Generate a report tailored to the user's request.
+
+For a general status report, inspect:
+- Node status using rln_get_node_info.
+- Wallet balances using rln_get_balances.
+- RGB assets using rln_list_assets.
+- Lightning channels using rln_list_channels.
+- Payment history using rln_list_payments.
+- Transfer history using rln_list_transfers.
+- Swap history using rln_list_swaps.
+
+Tool requirements:
+- Inspect the actual tool schema before supplying arguments.
+- Never pass missing required arguments as undefined.
+- If a tool requires an asset_id, retrieve available assets first
+  and query transfers for each valid asset ID.
+- If no suitable asset ID exists, explain that transfer history
+  could not be checked through that tool.
+- If one tool fails, continue with the other relevant tools.
+- Never interpret a tool failure as an empty result.
+
+Presentation:
+- Adapt the report to the user's question.
+- Summarize important findings rather than dumping raw JSON.
+- Separate node status, balances, assets, channels and histories.
+- State which checks failed or could not be completed.
+- Distinguish zero balances from unavailable data.
+- Never claim that a returned history is complete unless verified.
+- This is a read-only report. Never execute transactions or swaps.
+`;
+
 // --------------------------------------------------
 // Task router
 // --------------------------------------------------
@@ -778,6 +833,39 @@ Do not claim to have complete Bitcoin on-chain transaction
 history because no such generic tool is configured here.
 `,
   },
+
+  report: {
+  tools: [
+    "rln_get_node_info",
+    "rln_get_balances",
+    "rln_list_assets",
+    "rln_list_channels",
+    "rln_list_payments",
+    "rln_list_transfers",
+    "rln_list_swaps",
+  ],
+  instructions: `
+Generate a comprehensive RGB Explorer status report.
+
+Inspect the node, wallet balances, RGB assets, Lightning
+channels, payment history, transfer history, and swap history.
+
+Call every available tool listed for this task.
+Organize the response into these sections:
+1. Node status
+2. Wallet balances
+3. RGB assets
+4. Lightning channels
+5. Payments
+6. Transfers
+7. Swaps
+8. Issues and unavailable information
+
+Use only data returned by tools. Clearly identify failed
+queries and unavailable information. Never invent values.
+Distinguish historical operations from executed transactions.
+`,
+},
   
 rebalance: {
   tools: [
@@ -812,6 +900,9 @@ function selectTask(question) {
     return TASKS.quote;
   }
 
+  if (/\b(report|full report|status report|summary report)\b/.test(q)) {
+  return TASKS.report;
+  }
   // Specific operation histories take priority over generic history.
   if (
     /\b(transfer|transfers|incoming transfer|outgoing transfer|transfer history|transfer status)\b/.test(q)
@@ -863,6 +954,7 @@ function selectTask(question) {
   return null;
 }
 
+
 // --------------------------------------------------
 // Agent state
 // --------------------------------------------------
@@ -895,6 +987,7 @@ function buildSkills() {
   registry.addMarkdown(SWAP_SKILL.trim());
   registry.addMarkdown(TRANSACTION_SKILL.trim());
   registry.addMarkdown(TREASURY_SKILL.trim());
+  registry.addMarkdown(REPORT_SKILL.trim());
 
   return registry;
 }
@@ -949,10 +1042,10 @@ async function initializeAgentInternal() {
   ]);
 
   console.log("Available read-only tools:", ALLOWED_TOOLS);
-  console.log("Loading Qwen 3.5 2B...");
+  console.log("Loading ", MODEL_SELECTED, "...");
 
   modelId = await loadModel({
-    modelSrc: QWEN3_5_2B_MULTIMODAL_Q4_K_M,
+    modelSrc: MODEL_SELECTED,
     modelConfig: {
       ctx_size: 8192,
       tools: true,
