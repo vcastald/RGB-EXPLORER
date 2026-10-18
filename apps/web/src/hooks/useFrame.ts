@@ -22,7 +22,7 @@ const FALLBACK_QUOTES: MarketQuote[] = [
     baseTicker: 'BTC',
     quoteTicker: 'USDT',
     price: 0,
-    formattedPrice: '80.845,86 USDT',
+    formattedPrice: '80,845.86 USDT',
     updatedAt: new Date().toISOString(),
   },
   {
@@ -30,7 +30,7 @@ const FALLBACK_QUOTES: MarketQuote[] = [
     baseTicker: 'BTC',
     quoteTicker: 'XAUT',
     price: 0,
-    formattedPrice: '19,3872 XAUT',
+    formattedPrice: '19.3872 XAUT',
     updatedAt: new Date().toISOString(),
   },
   {
@@ -38,15 +38,15 @@ const FALLBACK_QUOTES: MarketQuote[] = [
     baseTicker: 'USDT',
     quoteTicker: 'XAUT',
     price: 0,
-    formattedPrice: '0,00024277 XAUT',
+    formattedPrice: '0.00024277 XAUT',
     inversePrice: 4119.11,
-    inverseFormatted: '4.119,11 USDT',
+    inverseFormatted: '4,119.11 USDT',
     updatedAt: new Date().toISOString(),
   },
 ]
 
 export function useFrame(intervalMs: number = 5 * 60 * 1000) {
-  const [quotes, setQuotes] = useState<MarketQuote[]>(FALLBACK_QUOTES)
+  const [quotes, setQuotes] = useState<MarketQuote[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -69,7 +69,8 @@ export function useFrame(intervalMs: number = 5 * 60 * 1000) {
         setError(null)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Impossibile aggiornare le quotazioni')
+      setError(err instanceof Error ? err.message : 'Unable to refresh quotes')
+      setQuotes((prev) => (prev.length > 0 ? prev : FALLBACK_QUOTES))
     } finally {
       setLoading(false)
     }
@@ -92,3 +93,10 @@ export function useFrame(intervalMs: number = 5 * 60 * 1000) {
     refresh: fetchQuotes,
   }
 }
+
+export {
+  useRgbTransfersRefresh,
+  useRgbFrame,
+  useTransfersRefreshFrame,
+  type RgbTransfersRefreshState,
+} from './useRgbTransfersRefresh'

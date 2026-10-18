@@ -46,6 +46,24 @@ const fakeAddress = (address: string) => ({
   createdAt: '2026-10-17T12:00:00.000Z',
 })
 
+const emptyPayments = async () => ({
+  observedAt: '2026-10-17T12:00:00.000Z',
+  payments: [],
+  channelLiquidity: {
+    totalCapacitySat: 0,
+    localBalanceSat: 0,
+    remoteBalanceSat: 0,
+    localBalanceBtc: 0,
+    capacityBtc: 0,
+    channelsCount: 0,
+  },
+})
+
+const emptyTransfers = async () => ({
+  observedAt: '2026-10-17T12:00:00.000Z',
+  transfers: [],
+})
+
 test('wallet overview returns service response', async () => {
   const overview = {
     observedAt: '2026-10-17T12:00:00.000Z',
@@ -63,6 +81,9 @@ test('wallet overview returns service response', async () => {
       createDepositAddress: async () => fakeAddress('tb1-test'),
       listDepositAddresses: async () => [],
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
+      listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: emptyPayments,
+      listTransfers: emptyTransfers,
     },
   })
   try {
@@ -81,6 +102,9 @@ test('wallet overview returns 503 when node fails', async () => {
       createDepositAddress: async () => { throw new Error('connection refused') },
       listDepositAddresses: async () => [],
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
+      listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: emptyPayments,
+      listTransfers: emptyTransfers,
     },
   })
   try {
@@ -100,6 +124,9 @@ test('deposit address route creates a new address with POST', async () => {
       createDepositAddress: async () => fakeAddress(`tb1-test-${++calls}`),
       listDepositAddresses: async () => [fakeAddress('tb1-test-1')],
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
+      listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: emptyPayments,
+      listTransfers: emptyTransfers,
     },
   })
   try {
@@ -122,6 +149,9 @@ test('deposit address route returns 503 when the node fails', async () => {
       createDepositAddress: async () => { throw new Error('offline') },
       listDepositAddresses: async () => { throw new Error('offline') },
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
+      listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: emptyPayments,
+      listTransfers: emptyTransfers,
     },
   })
   try {
@@ -140,6 +170,9 @@ test('deposit address route flags a storage failure without implying retry is sa
       createDepositAddress: async () => { throw new AddressStorageError('disk full') },
       listDepositAddresses: async () => [],
       getQuotes: async () => ({ observedAt: '', quotes: [] }),
+      listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: emptyPayments,
+      listTransfers: emptyTransfers,
     },
   })
   try {
@@ -171,12 +204,182 @@ test('quotes endpoint returns market quotes', async () => {
       createDepositAddress: async () => ({} as any),
       listDepositAddresses: async () => [],
       getQuotes: async () => quotesRes,
+      listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: emptyPayments,
+      listTransfers: emptyTransfers,
     },
   })
   try {
     const response = await app.inject('/api/quotes')
     assert.equal(response.statusCode, 200)
     assert.deepEqual(response.json(), quotesRes)
+  } finally {
+    await app.close()
+  }
+})
+
+test('transactions endpoint returns node transactions', async () => {
+  const txData = {
+    observedAt: '2026-10-17T12:00:00.000Z',
+    transactions: [
+      {
+        id: 'tx-1',
+        txid: 'tx-1',
+        timestamp: '2026-10-17T12:00:00.000Z',
+        asset: 'BTC' as const,
+        amount: 0.1,
+        unit: 'BTC',
+        receivedSats: 10000000,
+        sentSats: 0,
+        feeSats: 200,
+        direction: 'incoming' as const,
+        status: 'settled' as const,
+        blockHeight: 100,
+        transactionType: 'User',
+        sender: {
+          name: 'Bitcoin On-Chain Deposit',
+          identifier: 'tx-1',
+          type: 'node' as const,
+        },
+        memo: 'On-chain User',
+      },
+    ],
+  }
+  const app = createApp({
+    kaleidoService: {
+      getOverview: async () => ({} as any),
+      createDepositAddress: async () => ({} as any),
+      listDepositAddresses: async () => [],
+      getQuotes: async () => ({ observedAt: '', quotes: [] }),
+      listTransactions: async () => txData,
+      listPayments: emptyPayments,
+      listTransfers: emptyTransfers,
+    },
+  })
+  try {
+    const resWallet = await app.inject('/api/wallet/transactions')
+    assert.equal(resWallet.statusCode, 200)
+    assert.deepEqual(resWallet.json(), txData)
+
+    const resAlias = await app.inject('/api/transactions')
+    assert.equal(resAlias.statusCode, 200)
+    assert.deepEqual(resAlias.json(), txData)
+  } finally {
+    await app.close()
+  }
+})
+
+test('payments endpoint returns lightning payments and channel liquidity', async () => {
+  const paymentsData = {
+    observedAt: '2026-10-17T12:00:00.000Z',
+    payments: [
+      {
+        id: 'pay-1',
+        paymentHash: 'pay-1',
+        timestamp: '2026-10-17T12:00:00.000Z',
+        asset: 'BTC',
+        amount: 0.00001,
+        unit: 'BTC',
+        amtMsat: 1000000,
+        assetAmount: null,
+        assetId: null,
+        direction: 'incoming' as const,
+        status: 'settled' as const,
+        payeePubkey: '021638f19de2140cf23db6efcf8ef30a2e5e542ed32112c53b4e14b538742d70a2',
+        preimage: 'preimage-1',
+        description: 'test payment',
+        sender: {
+          name: 'Lightning Payment Received',
+          identifier: '021638f19de2140cf23db6efcf8ef30a2e5e542ed32112c53b4e14b538742d70a2',
+          type: 'node' as const,
+        },
+        memo: 'test payment',
+        paymentType: 'lightning' as const,
+      },
+    ],
+    channelLiquidity: {
+      totalCapacitySat: 50000,
+      localBalanceSat: 3100,
+      remoteBalanceSat: 46900,
+      localBalanceBtc: 0.000031,
+      capacityBtc: 0.0005,
+      channelsCount: 1,
+    },
+  }
+
+  const app = createApp({
+    kaleidoService: {
+      getOverview: async () => ({} as any),
+      createDepositAddress: async () => ({} as any),
+      listDepositAddresses: async () => [],
+      getQuotes: async () => ({ observedAt: '', quotes: [] }),
+      listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: async () => paymentsData,
+      listTransfers: emptyTransfers,
+    },
+  })
+  try {
+    const resWallet = await app.inject('/api/wallet/payments')
+    assert.equal(resWallet.statusCode, 200)
+    assert.deepEqual(resWallet.json(), paymentsData)
+
+    const resAlias = await app.inject('/api/payments')
+    assert.equal(resAlias.statusCode, 200)
+    assert.deepEqual(resAlias.json(), paymentsData)
+  } finally {
+    await app.close()
+  }
+})
+
+test('transfers endpoint returns on-chain RGB transfers', async () => {
+  const transfersData = {
+    observedAt: '2026-10-17T12:00:00.000Z',
+    transfers: [
+      {
+        id: 'tx-usdt-1:1',
+        idx: 1,
+        txid: 'tx-usdt-1',
+        timestamp: '2026-10-17T12:00:00.000Z',
+        asset: 'USDT',
+        amount: 250,
+        unit: 'USDT',
+        direction: 'incoming' as const,
+        status: 'settled' as const,
+        kind: 'ReceiveBlind',
+        recipientId: 'blinded-1',
+        receiveUtxo: null,
+        changeUtxo: null,
+        sender: {
+          name: 'RGB On-Chain USDT Deposit',
+          identifier: 'tx-usdt-1',
+          type: 'node' as const,
+        },
+        memo: 'On-chain RGB USDT transfer (ReceiveBlind)',
+        paymentType: 'onchain' as const,
+        assetId: 'rgb:usdt-id',
+      },
+    ],
+  }
+
+  const app = createApp({
+    kaleidoService: {
+      getOverview: async () => ({} as any),
+      createDepositAddress: async () => ({} as any),
+      listDepositAddresses: async () => [],
+      getQuotes: async () => ({ observedAt: '', quotes: [] }),
+      listTransactions: async () => ({ observedAt: '', transactions: [] }),
+      listPayments: emptyPayments,
+      listTransfers: async () => transfersData,
+    },
+  })
+  try {
+    const resWallet = await app.inject('/api/wallet/transfers')
+    assert.equal(resWallet.statusCode, 200)
+    assert.deepEqual(resWallet.json(), transfersData)
+
+    const resAlias = await app.inject('/api/transfers')
+    assert.equal(resAlias.statusCode, 200)
+    assert.deepEqual(resAlias.json(), transfersData)
   } finally {
     await app.close()
   }

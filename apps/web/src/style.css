@@ -1,9 +1,87 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   body {
-    @apply min-h-screen bg-slate-950 text-slate-100 antialiased;
+    @apply min-h-screen bg-slate-950 text-slate-100 antialiased transition-colors duration-200;
   }
+}
+
+/* Light / White Mode Theme Overrides */
+html.light {
+  --color-slate-950: #f8fafc; /* Main background */
+  --color-slate-900: #ffffff; /* Card / Surface background */
+  --color-slate-800: #e2e8f0; /* Borders */
+  --color-slate-700: #cbd5e1; /* Hover borders */
+  --color-slate-600: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-400: #64748b; /* Secondary muted text */
+  --color-slate-300: #475569; /* Semi-dark text */
+  --color-slate-200: #1e293b; /* Dark text */
+  --color-slate-100: #0f172a; /* Primary text */
+  color-scheme: light;
+}
+
+html.light body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* Headings in Light Mode */
+html.light h1,
+html.light h2,
+html.light h3,
+html.light h4,
+html.light h5,
+html.light h6 {
+  color: #0f172a !important;
+}
+
+/* General white text replacement except when on strong colored backgrounds */
+html.light .text-white {
+  color: #0f172a;
+}
+
+/* Keep white text on solid buttons like orange/indigo */
+html.light .bg-orange-500.text-white,
+html.light .bg-orange-500 .text-white,
+html.light .bg-indigo-600.text-white,
+html.light .bg-indigo-500 .text-white {
+  color: #ffffff !important;
+}
+
+/* Ensure text on solid yellow/emerald buttons stays dark */
+html.light .bg-amber-400,
+html.light .bg-emerald-500 {
+  color: #020617 !important;
+}
+
+/* Inputs & textareas in light mode */
+html.light input,
+html.light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Light mode card shadow improvements */
+html.light .shadow-xl {
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.06), 0 2px 6px -2px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .shadow-2xl {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .backdrop-blur-md,
+html.light .backdrop-blur-sm {
+  background-color: rgba(255, 255, 255, 0.9) !important;
 }
 
 @keyframes fadeIn {
@@ -34,4 +112,15 @@
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.8);
+}
+
+/* Scrollbar for light mode */
+html.light .custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+html.light .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+html.light .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }

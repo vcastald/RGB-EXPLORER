@@ -32,4 +32,61 @@ export function registerWalletRoutes(app: FastifyInstance) {
       return reply.code(503).send({ error: 'Node unavailable' })
     }
   })
+
+  app.get('/api/wallet/transactions', async (_request, reply) => {
+    try {
+      return await app.kaleidoService.listTransactions()
+    } catch (error) {
+      app.log.warn({ error }, 'Wallet transactions unavailable')
+      return reply.code(503).send({ error: 'Node unavailable' })
+    }
+  })
+
+  // Alias /api/transactions
+  app.get('/api/transactions', async (_request, reply) => {
+    try {
+      return await app.kaleidoService.listTransactions()
+    } catch (error) {
+      app.log.warn({ error }, 'Transactions unavailable')
+      return reply.code(503).send({ error: 'Node unavailable' })
+    }
+  })
+
+  app.get('/api/wallet/payments', async (_request, reply) => {
+    try {
+      return await app.kaleidoService.listPayments()
+    } catch (error) {
+      app.log.warn({ error }, 'Wallet payments unavailable')
+      return reply.code(503).send({ error: 'Node unavailable' })
+    }
+  })
+
+  // Alias /api/payments
+  app.get('/api/payments', async (_request, reply) => {
+    try {
+      return await app.kaleidoService.listPayments()
+    } catch (error) {
+      app.log.warn({ error }, 'Payments unavailable')
+      return reply.code(503).send({ error: 'Node unavailable' })
+    }
+  })
+
+  app.get('/api/wallet/transfers', async (_request, reply) => {
+    try {
+      return await app.kaleidoService.listTransfers()
+    } catch (error) {
+      app.log.warn({ error }, 'Wallet transfers unavailable')
+      return reply.code(503).send({ error: 'Node unavailable' })
+    }
+  })
+
+  // Alias /api/transfers
+  app.get('/api/transfers', async (_request, reply) => {
+    try {
+      return await app.kaleidoService.listTransfers()
+    } catch (error) {
+      app.log.warn({ error }, 'Transfers unavailable')
+      return reply.code(503).send({ error: 'Node unavailable' })
+    }
+  })
 }

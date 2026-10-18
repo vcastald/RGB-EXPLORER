@@ -17,13 +17,15 @@ test('overview requests a fresh BTC balance', async () => {
     },
     listAssets: async () => ({ nia: [], uda: [], cfa: [], ifa: [] }),
     listChannels: async () => ({ channels: [] }),
+    listTransactions: async () => ({ transactions: [] }),
+    listPayments: async () => ({ payments: [] }),
   } satisfies NodeReader
   const result = await new KaleidoService(node, new SqliteAddressStore(':memory:'), () => new Date('2026-10-17T12:00:00Z')).getOverview()
-  assert.equal(skipSync, false)
+  assert.equal(skipSync, true)
   assert.deepEqual(result, {
     observedAt: '2026-10-17T12:00:00.000Z', network: 'SignetCustom', height: 42,
     pubkey: 'test-key',
-    btc: { vanilla: { settled: 0, future: 0, spendable: 0 }, colored: { settled: 0, future: 0, spendable: 0 }, cached: false },
+    btc: { vanilla: { settled: 0, future: 0, spendable: 0 }, colored: { settled: 0, future: 0, spendable: 0 }, cached: true },
     assets: [], channels: [],
   })
 })
@@ -33,7 +35,8 @@ test('address generation checks network before requesting a new address', async 
   const node = {
     getNetworkInfo: async () => ({ network: BitcoinNetwork.Regtest, height: 1 }),
     getAddress: async () => { calls++; return { address: 'bcrt1-test' } },
-  } as NodeReader
+    listTransactions: async () => ({ transactions: [] }),
+  } as unknown as NodeReader
   await assert.rejects(() => new KaleidoService(node, new SqliteAddressStore(':memory:')).createDepositAddress(), /Mutinynet/)
   assert.equal(calls, 0)
 })
@@ -44,7 +47,8 @@ test('address generation returns node-derived address', async () => {
     getNetworkInfo: async () => ({ network: BitcoinNetwork.SignetCustom, height: 1 }),
     getAddress: async () => ({ address: `tb1-test-${++calls}` }),
     getNodeInfo: async () => ({ pubkey: 'key' }),
-  } as NodeReader
+    listTransactions: async () => ({ transactions: [] }),
+  } as unknown as NodeReader
   const service = new KaleidoService(node, new SqliteAddressStore(':memory:'), () => new Date('2026-10-17T12:00:00Z'))
   const expected = (address: string) => ({ address, network: 'SignetCustom', nodePubkey: 'key', createdAt: '2026-10-17T12:00:00.000Z' })
   assert.deepEqual(await service.createDepositAddress(), expected('tb1-test-1'))
@@ -72,4 +76,195 @@ test('quotes maps market pairs to structured quotes', async () => {
   assert.equal(res.quotes[2].pair, 'USDT/XAUT')
   assert.equal(res.quotes[2].price, 0.00025)
   assert.equal(res.quotes[2].inversePrice, 4000)
+})
+
+test('listTransactions maps on-chain transactions to normalized BTC records', async () => {
+  const node = {
+    listTransactions: async () => ({
+      transactions: [
+        {
+          transaction_type: 'User' as any,
+          txid: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+          received: 5000000,
+          sent: 0,
+          fee: 150,
+          confirmation_time: { height: 123456, timestamp: 1770000000 },
+        },
+      ],
+    }),
+  } as unknown as NodeReader
+  const service = new KaleidoService(node, new SqliteAddressStore(':memory:'), () => new Date('2026-10-17T12:00:00Z'))
+  const res = await service.listTransactions()
+  assert.equal(res.transactions.length, 1)
+  const tx = res.transactions[0]
+  assert.equal(tx.txid, '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')
+  assert.equal(tx.amount, 0.05)
+  assert.equal(tx.asset, 'BTC')
+  assert.equal(tx.direction, 'incoming')
+  assert.equal(tx.status, 'settled')
+})
+
+test('listPayments maps node payments and channel liquidity', async () => {
+  const node = {
+    listPayments: async () => ({
+      payments: [
+        {
+          amt_msat: 1000000,
+          asset_amount: null,
+          asset_id: null,
+          payment_hash: '94271e2152dcb1d343d77f7175aaebb4a806718d349de9416f5b9b1bf04999f8',
+          inbound: true,
+          status: 'Succeeded' as any,
+          created_at: 1770000000,
+          updated_at: 1770000050,
+          payee_pubkey: '021638f19de2140cf23db6efcf8ef30a2e5e542ed32112c53b4e14b538742d70a2',
+          preimage: 'd8fcc2bb7ff482e957d7e4ed2a36f6fa351b794f39bb01853ad770954e99d47a',
+          description: 'test payment',
+        },
+      ],
+    }),
+    listChannels: async () => ({
+      channels: [
+        {
+          channel_id: 'chan-1',
+          peer_pubkey: 'peer-1',
+          status: 'Opened' as any,
+          ready: true,
+          capacity_sat: 50000,
+          local_balance_sat: 3100,
+          outbound_balance_msat: 2100000,
+          inbound_balance_msat: 45240000,
+          is_usable: true,
+          public: false,
+          asset_id: null,
+          asset_local_amount: null,
+          asset_remote_amount: null,
+        },
+        {
+          channel_id: 'chan-rgb-2',
+          peer_pubkey: 'peer-2',
+          status: 'Opened' as any,
+          ready: true,
+          capacity_sat: 200000,
+          local_balance_sat: 10000,
+          outbound_balance_msat: 0,
+          inbound_balance_msat: 0,
+          is_usable: true,
+          public: false,
+          asset_id: 'rgb:test-asset-id',
+          asset_local_amount: 500,
+          asset_remote_amount: 500,
+        },
+      ],
+    }),
+  } as unknown as NodeReader
+  const service = new KaleidoService(node, new SqliteAddressStore(':memory:'), () => new Date('2026-10-17T12:00:00Z'))
+  const res = await service.listPayments()
+  assert.equal(res.payments.length, 1)
+  const payment = res.payments[0]
+  assert.equal(payment.paymentHash, '94271e2152dcb1d343d77f7175aaebb4a806718d349de9416f5b9b1bf04999f8')
+  assert.equal(payment.amount, 0.00001)
+  assert.equal(payment.asset, 'BTC')
+  assert.equal(payment.direction, 'incoming')
+  assert.equal(payment.status, 'settled')
+  assert.equal(payment.paymentType, 'lightning')
+  assert.equal(payment.memo, 'test payment')
+
+  assert.equal(res.channelLiquidity.channelsCount, 1)
+  assert.equal(res.channelLiquidity.totalCapacitySat, 50000)
+  assert.equal(res.channelLiquidity.localBalanceSat, 3100)
+  assert.equal(res.channelLiquidity.capacityBtc, 0.0005)
+  assert.equal(res.channelLiquidity.localBalanceBtc, 0.000031)
+})
+
+test('listTransfers maps on-chain RGB transfers with asset metadata and precision', async () => {
+  const node = {
+    listAssets: async () => ({
+      nia: [
+        {
+          asset_id: 'rgb:usdt-contract-id',
+          ticker: 'USDT',
+          name: 'Tether USD',
+          precision: 2,
+          issued_supply: 1000000,
+          timestamp: 1770000000,
+          added_at: 1770000000,
+          balance: { settled: 50000, future: 50000, spendable: 50000, offchain_outbound: 0, offchain_inbound: 0 },
+        },
+        {
+          asset_id: 'rgb:xaut-contract-id',
+          ticker: 'XAUT',
+          name: 'Tether Gold',
+          precision: 4,
+          issued_supply: 50000,
+          timestamp: 1770000000,
+          added_at: 1770000000,
+          balance: { settled: 12500, future: 12500, spendable: 12500, offchain_outbound: 0, offchain_inbound: 0 },
+        },
+      ],
+      uda: [],
+      cfa: [],
+      ifa: [],
+    }),
+    listTransfers: async (body?: any) => {
+      if (body?.asset_filter?.value === 'rgb:usdt-contract-id') {
+        return {
+          transfers: [
+            {
+              idx: 1,
+              created_at: 1770000100,
+              updated_at: 1770000200,
+              status: 'Settled' as any,
+              kind: 'ReceiveBlind' as any,
+              txid: 'tx-usdt-1234',
+              recipient_id: 'blinded-utxo-1',
+              assignments: [{ type: 'Fungible' as any, value: 50000 }],
+              transport_endpoints: [],
+            },
+          ],
+        }
+      }
+      if (body?.asset_filter?.value === 'rgb:xaut-contract-id') {
+        return {
+          transfers: [
+            {
+              idx: 2,
+              created_at: 1770000300,
+              updated_at: 1770000400,
+              status: 'Settled' as any,
+              kind: 'ReceiveWitness' as any,
+              txid: 'tx-xaut-5678',
+              recipient_id: 'witness-utxo-2',
+              assignments: [{ type: 'Fungible' as any, value: 12500 }],
+              transport_endpoints: [],
+            },
+          ],
+        }
+      }
+      return { transfers: [] }
+    },
+  } as unknown as NodeReader
+
+  const service = new KaleidoService(node, new SqliteAddressStore(':memory:'), () => new Date('2026-10-17T12:00:00Z'))
+  const res = await service.listTransfers()
+
+  assert.equal(res.transfers.length, 2)
+
+  const usdtTx = res.transfers.find((t) => t.asset === 'USDT')
+  assert.ok(usdtTx)
+  assert.equal(usdtTx.amount, 500.0) // 50000 / 10^2
+  assert.equal(usdtTx.unit, 'USDT')
+  assert.equal(usdtTx.direction, 'incoming')
+  assert.equal(usdtTx.status, 'settled')
+  assert.equal(usdtTx.paymentType, 'onchain')
+  assert.equal(usdtTx.txid, 'tx-usdt-1234')
+
+  const xautTx = res.transfers.find((t) => t.asset === 'XAUT')
+  assert.ok(xautTx)
+  assert.equal(xautTx.amount, 1.25) // 12500 / 10^4
+  assert.equal(xautTx.unit, 'XAUT')
+  assert.equal(xautTx.direction, 'incoming')
+  assert.equal(xautTx.status, 'settled')
+  assert.equal(xautTx.paymentType, 'onchain')
+  assert.equal(xautTx.txid, 'tx-xaut-5678')
 })

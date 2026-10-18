@@ -1,4 +1,4 @@
-export type AssetType = 'USDT' | 'XAUT' | 'BTC'
+export type AssetType = 'USDT' | 'XAUT' | 'BTC' | 'BTC_LN'
 
 export type Denomination = 'USD' | 'BTC'
 
@@ -17,6 +17,26 @@ export interface Transaction {
   sender: TransactionSender
   channelId?: string
   paymentHash?: string
-  status: 'settled' | 'pending'
+  txid?: string
+  direction?: 'incoming' | 'outgoing'
+  blockHeight?: number | null
+  status: 'settled' | 'pending' | 'failed'
   memo?: string
+  paymentType?: 'lightning' | 'onchain'
 }
+
+export interface ChannelLiquidity {
+  totalCapacitySat: number
+  localBalanceSat: number
+  remoteBalanceSat: number
+  localBalanceBtc: number
+  capacityBtc: number
+  channelsCount: number
+}
+
+export interface TargetAllocation {
+  btc: number
+  xaut: number
+  usdt: number
+}
+

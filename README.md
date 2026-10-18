@@ -27,59 +27,266 @@ The goal is to simplify RGB business management through AI-powered insights, tre
 
 *Work completed before the hackathon is available in the `lib/` directory.*
 
-## Local development
+## Prerequisites
 
-Requires Node.js 20.19+ (or 22.12+) and npm.
+Before starting, ensure you have the following installed on your machine:
 
+- **Git**
+- **Node.js** 20.19+ or 22.12+ (Node.js 22+ recommended) and **npm**
+- **Docker & Docker Compose** (Docker Desktop on macOS/Windows, or Docker Engine + Compose on Linux). Docker must be running to host the RGB Lightning node.
+
+---
+
+## Quickstart: Step-by-Step Setup (From Scratch)
+
+If you have just cloned or never installed the repository before, follow these steps in order:
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/vcastald/repo-git.git
+cd repo-git
+```
+
+### 2. Install dependencies
+Install all root and workspace dependencies (`apps/api` and `apps/web`):
 ```bash
 npm install
-cp .env.example .env  # first time only; edit ports if needed
+```
+
+### 3. Configure environment variables
+Copy the template configuration file to `.env`:
+```bash
+cp .env.example .env
+```
+The default configuration works out-of-the-box:
+- `API_PORT=3101` (Fastify backend)
+- `WEB_PORT=5173` (Vite React frontend)
+- `RGB_NODE_PORT=3901` (Docker RGB Lightning Node API)
+- `RGB_PEER_PORT=10091` (LDK peer port)
+- `RGB_PROXY_ENDPOINT=rpcs://proxy.iriswallet.com/0.2/json-rpc`
+- `KALEIDO_API_URL=https://api.mutinynet2.kaleidoswap.com`
+
+### 4. Start and initialize the RGB Lightning Node
+Make sure Docker is running, then execute:
+```bash
+npm run node:setup
+```
+What this does automatically:
+1. Launches the Docker container `kaleidoswap/rgb-lightning-node` in the background on port `3901`.
+2. Generates a secure wallet encryption password and seed (saved locally in `.local-node/password` and `.local-node/mnemonic`).
+3. Unlocks the wallet and synchronizes it with the Mutinynet custom Signet network.
+4. Confirms node status: you will see `Ready: signetcustom; node pubkey: <pubkey>`.
+
+> [!IMPORTANT]
+> Keep the `.local-node/` directory safe and private. Do not delete it, as it stores your local wallet database and channel state.
+> You can check node status anytime with `npm run node:status` and stop it with `npm run node:stop`.
+
+### 5. Launch the application
+Start both the backend API and frontend dev server concurrently:
+```bash
 npm run dev
 ```
 
-Open http://127.0.0.1:5173 (or `WEB_PORT` from `.env`). Vite proxies `/api` to Fastify on `API_PORT` from the same root `.env`. The sample endpoint is `GET /api/health`.
+This starts:
+- **Fastify Backend API** on `http://127.0.0.1:3101`
+- **Vite React Frontend** on `http://127.0.0.1:5173`
+
+### 6. Open the Dashboard
+Navigate to [http://127.0.0.1:5173](http://127.0.0.1:5173) in your browser.
+
+You will see:
+- **Node Connected Badge** (green) confirming connection to the local RGB Lightning node.
+- **Left Column:** **Agent Chat** — AI Treasury Assistant for analyzing positions, rebalancing proposals, and insights.
+- **Center Column:** **Transaction Feed** — Live list of incoming/outgoing transfers across on-chain RGB (USDT, XAUT), on-chain BTC, and Lightning payments.
+- **Right Column:** **Asset PieChart & Market Quotes** — Breakdown of confirmed (`Settled`) treasury holdings and live Kaleido market rates.
+- **Top Bar Actions:**
+  - **Deposit Addr:** Copy your on-chain Bitcoin deposit address for Mutinynet faucet funding.
+  - **Target Allocation:** Configure target treasury percentages for BTC, XAUT, and USDT.
+  - **Currency Selector:** Toggle portfolio valuation between `$ USD` and `₿ BTC`.
+  - **Create USDT invoice:** Generate RGB-20 on-chain USDT invoices directly from the UI with custom amounts to claim test-USDT from faucets or counterparty wallets.
+
+---
+
+## Development & Testing Commands
 
 ```bash
-npm run typecheck  # check both workspaces
-npm test           # API smoke test
-npm run build      # frontend bundle in apps/web/dist
+# Typecheck TypeScript across all workspaces
+npm run typecheck
+
+# Run automated tests (API routes, services, and storage)
+npm test
+
+# Build production bundle for the frontend
+npm run build
+
+# Docker Node management
+npm run node:status   # Check Docker container status
+npm run node:stop     # Stop the node container cleanly
 ```
 
-Tailwind CSS v4 is configured via the Vite plugin and `apps/web/src/style.css`. The frontend and backend run as separate processes; production hosting/proxy configuration is not included.
+---
 
-## Local Mutinynet wallet (one per developer)
+## Advanced: BTC Lightning Setup & Channel Management
 
-Requires Docker Desktop (with Compose) and Node.js 22+. Copy `.env.example` to `.env` first (if you haven't already). The pinned KaleidoSwap 0.10.1 image supports both Linux amd64 and arm64 through Docker's multi-platform image index. On a new clone:
-
-```bash
-npm install
-npm run node:setup
-```
-
-This starts one isolated RGB Lightning node and initializes **one new wallet per machine**. Re-running `npm run node:setup` after a restart unlocks the **same** wallet; it will not initialize another if setup is incomplete. Check `npm run node:status`; stop without deleting wallet data using `npm run node:stop`.
-
-Fastify exposes `GET /api/node/status` (HTTP 200 with `{ "online": true, "pubkey": "..." }`, or HTTP 503 with `{ "online": false }`). Set `RGB_NODE_URL` on the API process to override the default node address.
-
-By default the node API is at `http://127.0.0.1:3901` (Lightning peer port `10091`). Change `RGB_NODE_PORT` and `RGB_PEER_PORT` in `.env` before creating a node if those ports are taken; Docker Compose, setup and Fastify read these values. `RGB_NODE_URL` optionally overrides Fastify's node target only. Do not change node ports after creating a wallet without first stopping the container and checking your setup. It runs on KaleidoSwap's Mutinynet (`SignetCustom`) with transaction sync via `https://esplora.signet.kaleidoswap.com`. It is **not yet connected to the Fastify UI** and has no funds or channels. Keep `.env` local; `.env.example` contains only safe defaults.
-
-**Back up immediately:** `.local-node/mnemonic` contains the secret recovery phrase; `.local-node/password` is the wallet password. Save these securely and never share or commit them. The mnemonic alone **cannot restore RGB/Lightning channel state**: preserve/back up the entire `.local-node/data` directory too, with the node stopped. `.local-node/` is gitignored. The node's unauthenticated API is bound to localhost only; do not expose it to the internet. This is a test-network setup, not a production wallet. Do not delete `.local-node/` to fix a setup error; inspect it first.
-
-## Read-only wallet overview API
-
-`GET /api/wallet/overview` returns `{ observedAt, network, height, pubkey, btc, assets, channels }`. `btc.vanilla` and `btc.colored` are satoshi balances (`settled`, `future`, `spendable`); `btc.cached: false` means the request syncs the BTC wallet to find recent deposits; the request can take longer if the indexer is slow. `assets` contains `{ schema, assetId, ticker, name, precision, balance }` and `channels` contains `{ channelId, peerPubkey, status, usable, capacitySat, localBalanceSat, assetId }`. When the node is unavailable or locked, it returns HTTP 503 `{ "error": "Node unavailable" }` (no partial snapshot). The endpoint does not include payment history yet.
-
-```bash
-curl http://127.0.0.1:3101/api/wallet/overview
-```
-
-Fastify decorates the app with a KaleidoSwap service from `apps/api/src/services/kaleido.ts`; the route lives in `apps/api/src/routes/wallet.ts`. Offline tests inject a fake service or SDK node; the curl command exercises the live node. No frontend changes are needed.
-
-## Generate a BTC deposit address
-
-With the Mutinynet node running and unlocked, request an address from the backend:
+If starting from a fresh unfunded wallet, obtain a **Mutinynet on-chain** deposit address via the running API or UI:
 
 ```bash
 curl -X POST http://127.0.0.1:3101/api/wallet/deposit-addresses
 ```
 
-Returns HTTP 201 `{ "address": "...", "network": "SignetCustom", "nodePubkey": "...", "createdAt": "..." }`. **Each POST requests a fresh address** from the same wallet; use it for the first deposit or for subsequent deposits. It does not contact a faucet, fund the wallet, or create a Lightning channel. Addresses are recorded in a local SQLite database (`APP_DB_PATH` in `.env`, default `.local-app/addresses.sqlite`). List recorded addresses for the current wallet with `curl http://127.0.0.1:3101/api/wallet/deposit-addresses`. This database is an app-side record, **not a wallet backup**: node-generated addresses may exist even if saving fails or the process crashes. HTTP 503 means the node is unavailable or not on Mutinynet; HTTP 500 on storage failure means do not blindly retry the request. Only send **Mutinynet test BTC** to these addresses; back up the wallet's node data before funding it. This local dev endpoint has no user authentication—do not expose Fastify publicly.
+Each POST derives a new address. Fund it with test BTC and wait for confirmation. Existing addresses: `GET /api/wallet/deposit-addresses`; balances: `GET /api/wallet/overview`. Neither funding nor starting the wallet creates a Lightning channel.
+
+### 2. Buy a BTC inbound channel (new wallet only)
+
+**If you already have a BTC order, skip this step.** Our current wallet already has a completed BTC order; rerunning setup will not buy a second channel.
+
+```bash
+npm run merchant:plan        # read-only fee estimate; not the final payment total
+npm run merchant:setup       # review proposal; type CREATE BTC ORDER to place one order
+npm run merchant:pay -- BTC  # review actual amount/address/expiry; type PAY BTC <amount> to pay
+```
+
+`merchant:setup` creates an order but **does not pay it**. `merchant:pay` makes an on-chain test-BTC payment only after typed approval; miner fee is extra. Do not pay an expired order, repeat a payment after an error/timeout, or delete `.local-app/merchant-orders.json` to try again: it holds the order ID, access token, and payment-attempt record. Investigate uncertain results first. The workflow is **BTC only**; it does not create RGB/USDT orders.
+
+### 3. Check readiness (safe to repeat)
+
+```bash
+npm run merchant:status     # order state plus actual BTC channel readiness
+# When API is running:
+curl http://127.0.0.1:3101/api/lightning/readiness
+```
+
+Look for BTC order `COMPLETED`, channel `ready: true` and `isUsable: true`, a connected peer, and positive **inbound** liquidity (API amounts are in **msat**). Order completion alone is not proof of readiness. On this wallet, a 1,000-sat inbound BTC payment was verified `Succeeded` on Mutinynet. For a new wallet, test an invoice paid by a **different Mutinynet Lightning wallet** before relying on receipts.
+
+With the API running, create a one-hour BTC invoice (1–40,000 sats):
+
+```bash
+curl -X POST 'http://127.0.0.1:3101/api/lightning/invoices' -H 'Content-Type: application/json' -d '{"amountSat":1000,"description":"test"}'
+```
+
+This POST creates a **new** invoice each time; save the returned `invoice` and pay it from another Mutinynet wallet. Check its status (replace the placeholder):
+
+```bash
+curl -X POST 'http://127.0.0.1:3101/api/lightning/invoices/status' -H 'Content-Type: application/json' -d '{"invoice":"PASTE_RETURNED_INVOICE_HERE"}'
+```
+
+Only `{"status":"Succeeded"}` proves receipt. These local endpoints have no authentication; do not expose the API publicly.
+
+Historical failed USDT orders are retained in private archived journals for refund tracking (see below). `merchant:status` reads only the active merchant journal, not archived history. **Do not repay or retry historical failed orders.**
+
+Ports and node/API URLs can be configured in `.env`. Keep `.env` private. The local Fastify API has no user authentication; do not publish it.
+
+### USDT receiving capacity (read-only backend stage)
+
+With the API running, `GET /api/lightning/usdt/capacity` reports existing USDT channels **without calling the LSP**. To preview additional whole-USDT inbound capacity, POST `{"additionalUsdt":20}` to `/api/lightning/usdt/estimate`. It checks live LSP capabilities and returns a fee estimate for a separate receiving-only channel (50,000 LSP sats, 20,000 client sats, 20 test-USDT on the LSP side, 13,140 blocks). If the LSP times out, the estimate returns HTTP 503; retry the **lookup** later. No order or payment is created.
+
+These backend endpoints are read-only. **Do not expose this unauthenticated local API publicly.**
+
+### Open a test-USDT Lightning receiving channel
+
+Prerequisites: run `npm run node:setup` and fund the current wallet with Mutinynet test BTC. The script proposes **20 USDT on the LSP side and zero USDT on your side**, with 50,000 LSP sats and 20,000 client sats. This is inbound receiving capacity, not a purchase of 20 USDT for your wallet. Actual receiving also depends on BTC carrier liquidity.
+
+The script defaults to `https://api.mutinynet2.kaleidoswap.com`. Its provider is configured independently through `USDT_LSP_URL` in your private `.env`; changing `KALEIDO_API_URL` does not change this script's provider:
+
+```dotenv
+USDT_LSP_URL=https://api.mutinynet2.kaleidoswap.com
+```
+
+Run these steps **one at a time** in an interactive terminal:
+
+1. **Create an order:**
+   ```bash
+   npm run usdt:setup
+   ```
+   Review the proposal and fee estimate, then type `CREATE USDT ORDER` to submit. This run does not pay the order.
+2. **Review and pay the saved order:**
+   ```bash
+   npm run usdt:setup
+   ```
+   Review the final payment total and expiry, then type the displayed `PAY USDT <amount>` confirmation if acceptable. The payment includes your 20,000-sat channel allocation and the LSP fee; the miner fee is additional and not independently capped. The script requires a further 2,000-sat balance reserve, which is not a miner-fee cap.
+3. **Check readiness:**
+   ```bash
+   npm run usdt:setup -- --status
+   ```
+   Repeat this status-only command while the channel opens. `COMPLETED` / `PAID` alone is not receiving readiness: require `receiveReady: true`, with the matching node channel ready and usable. Then test a small Lightning invoice using the endpoint below.
+
+**Order history and retry safety:**
+
+- Mutinynet2 uses `.local-app/usdt-order-mutinynet2.json`. The supported legacy provider `https://api.signet.kaleidoswap.com` uses `.local-app/usdt-order.json`. Journals contain private order credentials; never commit or publish them.
+- Existing orders are resumed, not replaced. A journal belonging to another wallet/network/provider is rejected. When deliberately replacing a wallet, archive its journals under `.local-app/archived-orders/<old-node-pubkey>/` before starting a new order; never relabel an old order as belonging to the new wallet.
+- This project's old-wallet merchant and USDT journals were moved to that archive. Historical failed orders still require separate refund follow-up; archiving does not refund them, and normal status commands do not read archived journals.
+- **If order creation or payment times out, stop.** Do not delete the journal or lock file, create a replacement order, or resend payment. Use status and reconcile uncertain submissions with the LSP first. `FAILED` / `TO_REFUND` does not mean a refund has completed.
+
+Fastify does not expose order/payment actions. Capacity checks and fee estimates never create or pay orders. These channel scripts are not needed for on-chain RGB receiving.
+
+### Create a test-USDT Lightning invoice
+
+`POST /api/lightning/usdt/invoices` accepts a decimal-string `amountUsdt` (up to six decimals, 0.000001–1000) and optional `description` (200 characters).
+
+```sh
+curl -sS http://127.0.0.1:3101/api/lightning/usdt/invoices -H 'Content-Type: application/json' -d '{"amountUsdt":"1","description":"Test sale"}'
+```
+
+The invoice requests the specified test-USDT **plus 3,000 sats of BTC carrier**, not a fee-only BTC amount. It expires after 300 seconds. Creation requires an opened, ready, usable channel with enough USDT and BTC inbound capacity on the same channel; capacity is not reserved and settlement is not guaranteed. Returns 201 with `invoice`, `assetId`, `assetAmount` (integer units), `assetPrecision`, `amountUsdt`, `carrierSat`, and `expirySec`; invalid amounts return 400, unavailable capacity/network 409, and node failures 503. No LSP order or payment is created. This local unauthenticated API is not intended for public exposure.
+
+### Create an on-chain test-USDT invoice
+
+For the faucet's **RGB on-chain** form (not Lightning):
+
+```sh
+curl -sS http://127.0.0.1:3101/api/rgb/usdt/invoices -H 'Content-Type: application/json' -d '{}'
+```
+
+Copy the returned `invoice` (`rgb:…`). This requests the known Mutinynet USDT asset without fixing an amount, suitable for a fixed-size faucet claim. Optionally pass `{"amountUsdt":"0.1"}` for an exact amount (six decimal places, 0.000001–1000). Witness receiving, one confirmation, and a one-hour expiry are used. No Lightning channel or 3,000-sat Lightning carrier is required. The sender funds the on-chain transfer.
+
+The response includes `recipientId` and `batchTransferIdx` for subsequent transfer checks; invoice creation is **not** proof of payment. Receipt requires RGB transfer refresh and on-chain settlement. The wallet must already know this USDT contract; unknown assets return 409 rather than silently creating an any-asset invoice. Configure `RGB_PROXY_ENDPOINT` for consignment transport. Node failures return 503; inspect transfers before retrying an uncertain creation. No sending or spending endpoint is exposed.
+
+### Create an on-chain test-XAUT invoice
+
+`POST /api/rgb/xaut/invoices` uses the Mutinynet XAUT contract `rgb:qrilKFY5-VBmdIOF-cH5ziA8-9K9MIFS-OwsjmXe-yOv3Oa8` with **9 decimal places**, witness receiving, one confirmation and a one-hour expiry.
+
+Once XAUT is known to the wallet, request an exact amount (0.000000001–1000):
+
+```sh
+curl -sS http://127.0.0.1:3101/api/rgb/xaut/invoices -H 'Content-Type: application/json' -d '{"amountXaut":"0.01"}'
+```
+
+For a first faucet receipt when XAUT is unknown, explicitly allow an **any-asset** invoice:
+
+```sh
+curl -sS http://127.0.0.1:3101/api/rgb/xaut/invoices -H 'Content-Type: application/json' -d '{"allowAnyAsset":true}'
+```
+
+Select **XAUT** in the faucet's **RGB on-chain** form. Bootstrap invoices must omit the amount; the faucet determines its claim amount. The response reports `anyAsset: true`, `assetId: null`, and `expectedAssetId` plus a warning: **the invoice itself does not restrict the asset**. Verify the received contract after refresh before treating the transfer as XAUT. Without explicit permission, an unknown asset returns 409. If XAUT is already known, the invoice stays XAUT-specific even with this permission. No XAUT channel, payment, or send operation is created by these endpoints.
+
+### Server-side on-chain receiving
+
+While Fastify is listening, it checks for pending incoming RGB transfers every 20 seconds and refreshes the wallet automatically, including unknown-asset receipts. Refreshes never overlap; errors back off up to 120 seconds. Shutdown waits for an active refresh. The node must remain running and unlocked. The sender may also need to refresh before broadcasting.
+
+New on-chain USDT/XAUT invoices save their recipient, expected contract, amount, expiry and node identity in the existing local SQLite database. Tracking survives server restarts. Check using the `recipientId` returned by invoice creation:
+
+```sh
+curl -sS -G http://127.0.0.1:3101/api/rgb/transfers/status --data-urlencode 'recipientId=PASTE_RECIPIENT_ID'
+```
+
+`paid` is true only for a settled incoming transfer with the expected contract and exact requested amount (or a positive fungible amount for amount-free invoices). The response includes actual asset, amount in base units, transaction ID, status and refresh health. Unknown-asset XAUT invoices are not considered paid merely because some asset arrived. Status queries do not trigger a refresh themselves.
+
+Invoices created before tracking was added are still refreshed and can be inspected by recipient, but return `tracked: false` and `paid: false`: their original intent was not persisted. Do not issue another invoice or send again merely to obtain a tracked record. An invoice-creation persistence error is uncertain; inspect node transfers before retrying. This API remains local and unauthenticated; do not expose it publicly.
+
+#### First USDT receipt on a fresh wallet
+
+No `usdt:setup` or Lightning channel is needed for on-chain receiving. If the wallet does not know USDT yet, explicitly create an amount-free bootstrap invoice:
+
+```sh
+curl -sS http://127.0.0.1:3101/api/rgb/usdt/invoices -H 'Content-Type: application/json' -d '{"allowAnyAsset":true}'
+```
+
+Select **USDT** at the faucet. This invoice accepts **any RGB asset**; the server records the expected USDT contract and only verifies payment against that contract. Do not include `amountUsdt` with bootstrap permission. After receipt and refresh, exact-amount USDT invoices work normally. Without explicit permission, unknown USDT still returns 409 rather than silently relaxing the asset restriction.
+
+To request an immediate on-chain RGB wallet refresh (USDT/XAUT, including unknown-asset receipts):
+
+```sh
+curl -sS -X POST http://127.0.0.1:3101/api/rgb/transfers/refresh
+```
+
+Returns `refreshed: true` and `refreshedAt` after the node call completes, or HTTP 503 on failure/uncertain completion. This shares the background refresh lock and coalesces concurrent manual requests. A successful refresh **does not mean an invoice is paid**; check its transfer status separately. Refresh processes wallet transfers and acknowledgements; it is not a read-only operation or a Lightning-payment retry. Keep this unauthenticated endpoint local.
